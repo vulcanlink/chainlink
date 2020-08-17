@@ -19,7 +19,7 @@ interface DispatchProps {
   fetchEthGasPrice: any
 }
 
-export interface Props extends StateProps, DispatchProps {}
+export interface Props extends StateProps, DispatchProps { }
 
 const OracleTable: React.FC<Props> = ({
   fetchEthGasPrice,
@@ -27,6 +27,7 @@ const OracleTable: React.FC<Props> = ({
   latestOraclesState,
 }) => {
   const [data, setData] = useState<any | undefined>()
+  //@ts-ignore
   const [gasPrice, setGasPrice] = useState<any | undefined>()
 
   useEffect(() => {
@@ -86,12 +87,16 @@ const OracleTable: React.FC<Props> = ({
   return (
     <div className="oracle-table">
       <h2 className="oracle-table-header">Oracles data</h2>
+      {
+        /*
       <div className="gas-price-info">
         <h4>
           <Icon type="check-circle" /> Recommended gas price:{' '}
           <b>{gasPrice} Gwei</b>
         </h4>
       </div>
+      */
+      }
       <Table
         dataSource={data}
         columns={columns}
