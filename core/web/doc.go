@@ -27,10 +27,6 @@
 // to the node, and shows the current specs which have already
 // been added.
 //
-// JobSpecErrorsController
-//
-// JobSpecErrorsController allows for errors to be dismissed
-//
 // Router
 //
 // Router defines the valid paths for the node and responds

@@ -6,8 +6,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink/core/internal/cltest"
-	"github.com/smartcontractkit/chainlink/core/store/models"
+	"chainlink/core/internal/cltest"
+	"chainlink/core/store/models"
 
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
@@ -15,11 +15,9 @@ import (
 )
 
 func TestChainlinkApplication_SignalShutdown(t *testing.T) {
-	app, appCleanUp := cltest.NewApplication(t,
-		cltest.LenientEthMock,
-		cltest.EthMockRegisterChainID,
-		cltest.EthMockRegisterGetBalance,
-	)
+	config, cleanup := cltest.NewConfig(t)
+	defer cleanup()
+	app, appCleanUp := cltest.NewApplicationWithConfig(t, config, cltest.EthMockRegisterChainID)
 	defer appCleanUp()
 
 	completed := abool.New()
@@ -36,12 +34,11 @@ func TestChainlinkApplication_SignalShutdown(t *testing.T) {
 }
 
 func TestChainlinkApplication_resumesPendingConnection_Happy(t *testing.T) {
-	app, cleanup := cltest.NewApplication(t,
-		cltest.LenientEthMock,
-		cltest.EthMockRegisterChainID,
-		cltest.EthMockRegisterGetBalance,
-	)
+	app, cleanup := cltest.NewApplication(t)
 	defer cleanup()
+	app.EthMock.Context("app.Start()", func(meth *cltest.EthMock) {
+		meth.Register("eth_chainId", app.Store.Config.ChainID())
+	})
 	store := app.Store
 
 	j := cltest.NewJobWithWebInitiator()
@@ -54,12 +51,11 @@ func TestChainlinkApplication_resumesPendingConnection_Happy(t *testing.T) {
 }
 
 func TestChainlinkApplication_resumesPendingConnection_Archived(t *testing.T) {
-	app, cleanup := cltest.NewApplication(t,
-		cltest.LenientEthMock,
-		cltest.EthMockRegisterChainID,
-		cltest.EthMockRegisterGetBalance,
-	)
+	app, cleanup := cltest.NewApplication(t)
 	defer cleanup()
+	app.EthMock.Context("app.Start()", func(meth *cltest.EthMock) {
+		meth.Register("eth_chainId", app.Store.Config.ChainID())
+	})
 	store := app.Store
 
 	j := cltest.NewJobWithWebInitiator()

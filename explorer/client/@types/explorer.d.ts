@@ -6,8 +6,6 @@ declare module 'explorer/models' {
     name: string
     url?: string
     createdAt: string
-    coreVersion?: string
-    coreSha?: string
   }
 
   interface JobRun {

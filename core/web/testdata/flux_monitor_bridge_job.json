@@ -7,14 +7,8 @@
         "data":{"coin":"ETH","market":"USD"}
       },
       "feeds": [ "https://lambda.staging.devnet.tools/bnc/call", { "bridge": "testbridge" } ],
-      "precision": 2,
       "threshold": 0.5,
-      "idleTimer": {
-        "disabled": true
-      },
-      "pollTimer": {
-        "period": "1m"
-      }
+      "precision": 2
     }
   }],
   "tasks": [

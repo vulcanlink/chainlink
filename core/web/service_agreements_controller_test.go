@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/core/internal/cltest"
-	"github.com/smartcontractkit/chainlink/core/store/models"
-	"github.com/smartcontractkit/chainlink/core/store/presenters"
+	"chainlink/core/internal/cltest"
+	"chainlink/core/store/models"
+	"chainlink/core/store/presenters"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,11 +23,12 @@ func TestServiceAgreementsController_Create(t *testing.T) {
 
 	app, cleanup := cltest.NewApplicationWithKey(t, cltest.LenientEthMock)
 	defer cleanup()
+	app.EthMock.RegisterSubscription("logs")
 
 	require.NoError(t, app.Start())
 
 	client := app.NewHTTPClient()
-	base := cltest.MustHelloWorldAgreement(t)
+	base := string(cltest.MustReadFile(t, "testdata/hello_world_agreement.json"))
 	base = strings.Replace(base, "2019-10-19T22:17:19Z", endAtISO8601, 1)
 	tests := []struct {
 		name     string
@@ -58,6 +59,11 @@ func TestServiceAgreementsController_Create(t *testing.T) {
 				assert.NotEqual(t, "", createdSA.Signature.String())
 				assert.Equal(t, endAt, createdSA.Encumbrance.EndAt.Time)
 
+				var jobids []*models.ID
+				for _, j := range app.JobSubscriber.Jobs() {
+					jobids = append(jobids, j.ID)
+				}
+				assert.Contains(t, jobids, createdSA.JobSpec.ID)
 				app.EthMock.EventuallyAllCalled(t)
 			}
 		})
@@ -69,12 +75,13 @@ func TestServiceAgreementsController_Create_isIdempotent(t *testing.T) {
 
 	app, cleanup := cltest.NewApplicationWithKey(t, cltest.LenientEthMock)
 	defer cleanup()
+	app.EthMock.RegisterSubscription("logs")
 
 	require.NoError(t, app.Start())
 
 	client := app.NewHTTPClient()
 
-	base := cltest.MustHelloWorldAgreement(t)
+	base := string(cltest.MustReadFile(t, "testdata/hello_world_agreement.json"))
 	base = strings.Replace(base, "2019-10-19T22:17:19Z", endAtISO8601, 1)
 	reader := bytes.NewBuffer([]byte(base))
 

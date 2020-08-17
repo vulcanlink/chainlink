@@ -2,93 +2,90 @@ package cltest
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/url"
-	"os"
-	"path"
-	"runtime"
+	"regexp"
+	"strings"
 	"testing"
 
-	"github.com/jinzhu/gorm"
-	"github.com/smartcontractkit/chainlink/core/gracefulpanic"
-	"github.com/smartcontractkit/chainlink/core/store/migrations"
-	"github.com/smartcontractkit/chainlink/core/store/orm"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"chainlink/core/store/dbutil"
+	"chainlink/core/store/models"
+	"chainlink/core/store/orm"
 )
 
-func dropAndCreateThrowawayTestDB(databaseURL string, postfix string) (string, error) {
-	parsed, err := url.Parse(databaseURL)
+// PrepareTestDB prepares the database to run tests, functionality varies
+// on the underlying database.
+// SQLite: No-op.
+// Postgres: Creates a second database, and returns a cleanup callback
+// that drops said DB.
+func PrepareTestDB(tc *TestConfig) func() {
+	t := tc.t
+	t.Helper()
+
+	originalURL := tc.DatabaseURL()
+	if dbutil.IsPostgresURL(originalURL) {
+		return createPostgresChildDB(tc, originalURL)
+	}
+
+	return func() {}
+}
+
+func createPostgresChildDB(tc *TestConfig, originalURL string) func() {
+	t := tc.t
+
+	parsed, err := url.Parse(originalURL)
 	if err != nil {
-		return "", err
+		t.Fatalf("unable to extract database from %v: %v", originalURL, err)
 	}
 
-	if parsed.Path == "" {
-		return "", errors.New("path missing from database URL")
-	}
+	testdb := createTestDB(t, parsed)
+	tc.Set("DATABASE_URL", testdb.String())
 
-	dbname := fmt.Sprintf("%s_%s", parsed.Path[1:], postfix)
-	if len(dbname) > 62 {
-		return "", errors.New("dbname too long, max is 63 bytes. Try a shorter postfix")
+	return func() {
+		reapPostgresChildDB(t, parsed, testdb)
+		tc.Set("DATABASE_URL", originalURL)
 	}
-	// Cannot drop test database if we are connected to it, so we must connect
-	// to a different one. template1 should be present on all postgres installations
-	parsed.Path = "/template1"
+}
+
+func createTestDB(t testing.TB, parsed *url.URL) *url.URL {
+	dbname := fmt.Sprintf("%s_%s_%s", parsed.Path[0:], models.NewID().String()[:8], t.Name())
+	dbname = strings.Replace(dbname, "/", "_", -1)
+	dbname = strings.Replace(dbname, "Test", "", 1)
+	dbname = strings.ToLower(dbname)
+	var safeCharsOnly = regexp.MustCompile(`[^0-9a-z_]+`)
+	dbname = safeCharsOnly.ReplaceAllString(dbname, "")
+	// NOTE: PostgreSQL's Max Identifier Length Is 63 Bytes
+	if len(dbname) > 63 {
+		dbname = dbname[:63]
+	}
 	db, err := sql.Open(string(orm.DialectPostgres), parsed.String())
 	if err != nil {
-		return "", fmt.Errorf("unable to open postgres database for creating test db: %+v", err)
+		t.Fatalf("unable to open postgres database for creating test db: %+v", err)
 	}
 	defer db.Close()
 
-	_, err = db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s", dbname))
-	if err != nil {
-		return "", fmt.Errorf("unable to drop postgres migrations test database: %v", err)
-	}
-	// `CREATE DATABASE $1` does not seem to work w CREATE DATABASE
+	//`CREATE DATABASE $1` does not seem to work w CREATE DATABASE
 	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %s", dbname))
 	if err != nil {
-		return "", fmt.Errorf("unable to create postgres migrations test database: %v", err)
+		t.Fatalf("unable to create postgres test database: %+v", err)
 	}
-	parsed.Path = fmt.Sprintf("/%s", dbname)
-	return parsed.String(), nil
+
+	newURL := *parsed
+	newURL.Path = "/" + dbname
+	return &newURL
 }
 
-// BootstrapThrowawayORM creates an ORM which runs in a separate database
-// than the normal unit tests, so it you can do things like use other
-// Postgres connection types with it.
-func BootstrapThrowawayORM(t *testing.T, name string, migrate bool, loadFixtures ...bool) (*TestConfig, *orm.ORM, func()) {
-	tc, cleanup := NewConfig(t)
-	config := tc.Config
-
-	require.NoError(t, os.MkdirAll(config.RootDir(), 0700))
-	migrationTestDBURL, err := dropAndCreateThrowawayTestDB(tc.DatabaseURL(), name)
-	require.NoError(t, err)
-	orm, err := orm.NewORM(migrationTestDBURL, config.DatabaseTimeout(), gracefulpanic.NewSignal(), orm.DialectPostgres, config.GetAdvisoryLockIDConfiguredOrDefault())
-	require.NoError(t, err)
-	orm.SetLogging(true)
-	tc.Config.Set("DATABASE_URL", migrationTestDBURL)
-	if migrate {
-		require.NoError(t, orm.RawDB(func(db *gorm.DB) error { return migrations.Migrate(db) }))
+func reapPostgresChildDB(t testing.TB, parentURL, testURL *url.URL) {
+	db, err := sql.Open(string(orm.DialectPostgres), parentURL.String())
+	if err != nil {
+		t.Fatalf("Unable to connect to parent CL db to clean up test database: %v", err)
 	}
-	if len(loadFixtures) > 0 && loadFixtures[0] {
-		_, filename, _, ok := runtime.Caller(0)
-		if !ok {
-			t.Fatal("could not get runtime.Caller(0)")
-		}
-		filepath := path.Join(path.Dir(filename), "../../store/testdata/fixtures.sql")
-		fixturesSQL, err := ioutil.ReadFile(filepath)
-		require.NoError(t, err)
-		err = orm.RawDB(func(db *gorm.DB) error {
-			return db.Exec(string(fixturesSQL)).Error
-		})
-		require.NoError(t, err)
-	}
+	defer db.Close()
 
-	return tc, orm, func() {
-		assert.NoError(t, orm.Close())
-		cleanup()
-		os.RemoveAll(config.RootDir())
+	testdb := testURL.Path[1:]
+	dbsSQL := "DROP DATABASE " + testdb
+	_, err = db.Exec(dbsSQL)
+	if err != nil {
+		t.Fatalf("Unable to clean up previous test database: %v", err)
 	}
 }

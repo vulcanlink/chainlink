@@ -15,8 +15,8 @@ import classNames from 'classnames'
 import { JobSpec } from 'operator_ui'
 import React from 'react'
 import { connect } from 'react-redux'
-import { Redirect, useRouteMatch } from 'react-router-dom'
-import { createJobRun, deleteJobSpec, fetchJobRuns } from 'actionCreators'
+import { Redirect } from 'react-router-dom'
+import { createJobRun, deleteJobSpec, fetchJobRuns } from '../../actions'
 import BaseLink from '../../components/BaseLink'
 import Button from '../../components/Button'
 import CopyJobSpec from '../../components/CopyJobSpec'
@@ -120,7 +120,7 @@ interface Props extends WithStyles<typeof styles> {
   createJobRun: Function
   deleteJobSpec: Function
   jobSpecId: string
-  job?: JobSpec
+  job: JobSpec
   url: string
 }
 
@@ -131,26 +131,20 @@ const RegionalNav = ({
   jobSpecId,
   job,
   deleteJobSpec,
+  url,
 }: Props) => {
-  const match = useRouteMatch()
-  const navErrorsActive = match.path.includes('errors')
-  const navDefinitionActive = match.path.includes('json')
-  const navOverviewActive = !navDefinitionActive && !navErrorsActive
+  const navOverviewActive = url && !url.includes('json')
+  const navDefinitionACtive = !navOverviewActive
   const definition = job && jobSpecDefinition(job)
   const [modalOpen, setModalOpen] = React.useState(false)
   const [archived, setArchived] = React.useState(false)
-  const errorsTabText =
-    job?.errors && job.errors.length > 0
-      ? `Errors (${job.errors.length})`
-      : 'Errors'
   const handleRun = () => {
-    createJobRun(jobSpecId, CreateRunSuccessNotification, ErrorMessage).then(
-      () =>
-        fetchJobRuns({
-          jobSpecId,
-          page: DEFAULT_PAGE,
-          size: RECENT_RUNS_COUNT,
-        }),
+    createJobRun(job.id, CreateRunSuccessNotification, ErrorMessage).then(() =>
+      fetchJobRuns({
+        jobSpecId: job.id,
+        page: DEFAULT_PAGE,
+        size: RECENT_RUNS_COUNT,
+      }),
     )
   }
   const handleDelete = (id: string) => {
@@ -305,21 +299,10 @@ const RegionalNav = ({
                   href={`/jobs/${jobSpecId}/json`}
                   className={classNames(
                     classes.horizontalNavLink,
-                    navDefinitionActive && classes.activeNavLink,
+                    navDefinitionACtive && classes.activeNavLink,
                   )}
                 >
                   JSON
-                </Link>
-              </ListItem>
-              <ListItem className={classes.horizontalNavItem}>
-                <Link
-                  href={`/jobs/${jobSpecId}/errors`}
-                  className={classNames(
-                    classes.horizontalNavLink,
-                    navErrorsActive && classes.activeNavLink,
-                  )}
-                >
-                  {errorsTabText}
                 </Link>
               </ListItem>
             </List>

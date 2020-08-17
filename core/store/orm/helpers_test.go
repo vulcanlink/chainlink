@@ -1,6 +1,6 @@
 package orm
 
-import "github.com/smartcontractkit/chainlink/core/gracefulpanic"
+import "chainlink/core/gracefulpanic"
 
 func (o *ORM) LockingStrategyHelperSimulateDisconnect() (error, error) {
 	err1 := o.lockingStrategy.(*PostgresLockingStrategy).conn.Close()

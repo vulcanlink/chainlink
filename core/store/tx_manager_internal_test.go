@@ -3,7 +3,7 @@ package store
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink/core/store/models"
+	"chainlink/core/store/models"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"

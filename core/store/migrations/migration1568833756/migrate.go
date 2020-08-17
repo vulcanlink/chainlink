@@ -3,7 +3,7 @@ package migration1568833756
 import (
 	"time"
 
-	"github.com/smartcontractkit/chainlink/core/store/models"
+	"chainlink/core/store/models"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jinzhu/gorm"

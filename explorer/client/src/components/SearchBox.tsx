@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
+import { connect } from 'react-redux'
 import Paper from '@material-ui/core/Paper'
 import IconButton from '@material-ui/core/IconButton'
 import SearchIcon from '@material-ui/icons/Search'
@@ -10,7 +11,7 @@ import {
   WithStyles,
 } from '@material-ui/core/styles'
 import classNames from 'classnames'
-import { searchQuery } from '../utils/searchQuery'
+import { AppState } from '../reducers'
 
 const styles = ({ palette, spacing }: Theme) =>
   createStyles({
@@ -32,15 +33,7 @@ interface Props extends WithStyles<typeof styles> {
   query?: string
 }
 
-const SearchBox = ({ classes, className }: Props) => {
-  const [query, setQuery] = useState<string>(searchQuery())
-
-  useEffect(() => {
-    const onPopState = () => setQuery(searchQuery())
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [setQuery])
-
+const SearchBox = ({ classes, className, query }: Props) => {
   return (
     <Paper elevation={0} className={classNames(classes.paper, className)}>
       <IconButton aria-label="Search" type="submit">
@@ -48,8 +41,7 @@ const SearchBox = ({ classes, className }: Props) => {
       </IconButton>
       <InputBase
         className={classes.query}
-        value={query}
-        onChange={e => setQuery(e.target.value)}
+        defaultValue={query}
         placeholder="Search for Job IDs, Run IDs, Transaction Hashes, or Requesting Addresses"
         name="search"
       />
@@ -57,4 +49,17 @@ const SearchBox = ({ classes, className }: Props) => {
   )
 }
 
-export default withStyles(styles)(SearchBox)
+const mapStateToProps = (state: AppState) => {
+  return {
+    query: state.search.query,
+  }
+}
+
+const mapDispatchToProps = () => ({})
+
+const ConnectedSearchBox = connect(
+  mapStateToProps,
+  mapDispatchToProps,
+)(SearchBox)
+
+export default withStyles(styles)(ConnectedSearchBox)

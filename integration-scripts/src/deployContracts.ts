@@ -25,8 +25,6 @@ async function deployContracts({ chainlinkNodeAddress }: Args) {
   const provider = createProvider()
   const signer = provider.getSigner(DEVNET_ADDRESS)
 
-  console.log('Deploying contracts from ' + DEVNET_ADDRESS)
-
   const linkToken = await deployLinkTokenContract()
 
   const oracle = await deployContract(

@@ -1,12 +1,12 @@
-import { FeedConfig } from 'config'
 import React from 'react'
 import { connect } from 'react-redux'
 import { AppState } from 'state'
-import {
-  aggregatorOperations,
-  aggregatorSelectors,
-} from 'state/ducks/aggregator'
 import { Vis } from '../vis'
+import { FeedConfig } from 'feeds'
+import {
+  aggregatorSelectors,
+  aggregatorOperations,
+} from 'state/ducks/aggregator'
 
 interface StateProps {
   config: FeedConfig
@@ -28,18 +28,16 @@ interface Props extends StateProps, DispatchProps {}
 
 const AggregatorVis: React.FC<Props> = props => <Vis {...props}></Vis>
 
-const mapStateToProps = (state: AppState) => {
-  return {
-    latestOraclesState: aggregatorSelectors.latestOraclesState(state),
-    latestAnswer: state.aggregator.latestAnswer,
-    latestAnswerTimestamp: state.aggregator.latestAnswerTimestamp,
-    pendingAnswerId: state.aggregator.pendingAnswerId,
-    oracleAnswers: state.aggregator.oracleAnswers,
-    oracleList: state.aggregator.oracleList,
-    latestRequestTimestamp: state.aggregator.latestRequestTimestamp,
-    minimumAnswers: state.aggregator.minimumAnswers,
-  }
-}
+const mapStateToProps = (state: AppState) => ({
+  latestOraclesState: aggregatorSelectors.latestOraclesState(state),
+  latestAnswer: state.aggregator.latestAnswer,
+  latestAnswerTimestamp: state.aggregator.latestAnswerTimestamp,
+  pendingAnswerId: state.aggregator.pendingAnswerId,
+  oracleAnswers: state.aggregator.oracleAnswers,
+  oracleList: state.aggregator.oracleList,
+  latestRequestTimestamp: state.aggregator.latestRequestTimestamp,
+  minimumAnswers: state.aggregator.minimumAnswers,
+})
 
 const mapDispatchToProps = {
   fetchJobId: aggregatorOperations.fetchJobId,

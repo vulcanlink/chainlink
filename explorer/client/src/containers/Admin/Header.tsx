@@ -51,6 +51,7 @@ interface OwnProps {
 
 interface StateProps {
   authenticated: boolean
+  errors: string[]
 }
 
 interface Props
@@ -100,6 +101,7 @@ const mapStateToProps: MapStateToProps<
 > = state => {
   return {
     authenticated: state.adminAuth.allowed,
+    errors: state.notifications.errors,
   }
 }
 

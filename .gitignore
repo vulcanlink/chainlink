@@ -3,7 +3,6 @@ node_modules/
 tmp/
 .pnp
 .pnp.js
-tools/bin/abigen
 
 /chainlink
 core/chainlink

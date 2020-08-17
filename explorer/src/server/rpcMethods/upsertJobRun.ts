@@ -1,5 +1,6 @@
 import { fromJSONObject, saveJobRunTree } from '../../entity/JobRun'
 import { logger } from '../../logging'
+import { getDb } from '../../database'
 import { ServerContext } from './../handleMessage'
 import jayson from 'jayson'
 
@@ -13,9 +14,10 @@ export default async (
   callback: jayson.JSONRPCCallbackTypePlain,
 ) => {
   try {
+    const db = await getDb()
     const jobRun = fromJSONObject(payload)
     jobRun.chainlinkNodeId = context.chainlinkNodeId
-    await saveJobRunTree(jobRun)
+    await saveJobRunTree(db, jobRun)
     callback(null, 'success')
   } catch (e) {
     logger.error(e)

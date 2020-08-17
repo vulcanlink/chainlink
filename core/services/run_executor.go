@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/core/adapters"
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/services/synchronization"
-	"github.com/smartcontractkit/chainlink/core/store"
-	"github.com/smartcontractkit/chainlink/core/store/models"
-	"github.com/smartcontractkit/chainlink/core/store/orm"
+	"chainlink/core/adapters"
+	"chainlink/core/logger"
+	"chainlink/core/services/synchronization"
+	"chainlink/core/store"
+	"chainlink/core/store/models"
+	"chainlink/core/store/orm"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -25,7 +25,7 @@ var (
 	)
 )
 
-//go:generate mockery --name RunExecutor --output ../internal/mocks/ --case=underscore
+//go:generate mockery -name RunExecutor -output ../internal/mocks/ -case=underscore
 
 // RunExecutor handles the actual running of the job tasks
 type RunExecutor interface {
@@ -63,11 +63,10 @@ func (re *runExecutor) Execute(runID *models.ID) error {
 			continue
 		}
 
-		if meetsMinRequiredIncomingConfirmations(&run, taskRun, run.ObservedHeight) {
+		if meetsMinimumConfirmations(&run, taskRun, run.ObservedHeight) {
 			start := time.Now()
 
-			// NOTE: adapters may define and return the new job run status in here
-			result := re.executeTask(&run, *taskRun)
+			result := re.executeTask(&run, taskRun)
 
 			taskRun.ApplyOutput(result)
 			run.ApplyOutput(result)
@@ -77,15 +76,15 @@ func (re *runExecutor) Execute(runID *models.ID) error {
 			logger.Debugw(fmt.Sprintf("Executed task %s", taskRun.TaskSpec.Type), run.ForLogger("task", taskRun.ID.String(), "elapsed", elapsed)...)
 
 		} else {
-			logger.Debugw("Pausing run pending incoming confirmations",
-				run.ForLogger("required_height", taskRun.MinRequiredIncomingConfirmations)...,
+			logger.Debugw("Pausing run pending confirmations",
+				run.ForLogger("required_height", taskRun.MinimumConfirmations)...,
 			)
-			taskRun.Status = models.RunStatusPendingIncomingConfirmations
-			run.SetStatus(models.RunStatusPendingIncomingConfirmations)
+			taskRun.Status = models.RunStatusPendingConfirmations
+			run.SetStatus(models.RunStatusPendingConfirmations)
 
 		}
 
-		if err := re.store.ORM.SaveJobRun(&run); errors.Cause(err) == orm.ErrOptimisticUpdateConflict {
+		if err := re.store.ORM.SaveJobRun(&run); errors.Cause(err) == orm.OptimisticUpdateConflictError {
 			logger.Debugw("Optimistic update conflict while updating run", run.ForLogger()...)
 			return nil
 		} else if err != nil {
@@ -105,16 +104,16 @@ func (re *runExecutor) Execute(runID *models.ID) error {
 	return nil
 }
 
-func (re *runExecutor) executeTask(run *models.JobRun, taskRun models.TaskRun) models.RunOutput {
-	taskSpec := taskRun.TaskSpec
+func (re *runExecutor) executeTask(run *models.JobRun, taskRun *models.TaskRun) models.RunOutput {
+	taskCopy := taskRun.TaskSpec // deliberately copied to keep mutations local
 
-	params, err := models.Merge(run.RunRequest.RequestParams, taskSpec.Params)
+	params, err := models.Merge(run.RunRequest.RequestParams, taskCopy.Params)
 	if err != nil {
 		return models.NewRunOutputError(err)
 	}
-	taskSpec.Params = params
+	taskCopy.Params = params
 
-	adapter, err := adapters.For(taskSpec, re.store.Config, re.store.ORM)
+	adapter, err := adapters.For(taskCopy, re.store.Config, re.store.ORM)
 	if err != nil {
 		return models.NewRunOutputError(err)
 	}
@@ -131,7 +130,7 @@ func (re *runExecutor) executeTask(run *models.JobRun, taskRun models.TaskRun) m
 		return models.NewRunOutputError(err)
 	}
 
-	input := *models.NewRunInput(run.ID, *taskRun.ID, data, taskRun.Status)
+	input := *models.NewRunInput(run.ID, data, taskRun.Status)
 	result := adapter.Perform(input, re.store)
 	promAdapterCallsVec.WithLabelValues(run.JobSpecID.String(), string(adapter.TaskType()), string(result.Status())).Inc()
 

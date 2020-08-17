@@ -32,9 +32,8 @@ interface OwnProps {
 }
 
 interface StateProps {
-  loading: boolean
-  error: boolean
-  count?: AppState['adminOperatorsIndex']['count']
+  loaded: boolean
+  count: AppState['adminOperatorsIndex']['count']
   adminOperators?: ChainlinkNode[]
 }
 
@@ -51,17 +50,16 @@ interface Props
 
 export const Index: React.FC<Props> = ({
   classes,
-  loading,
-  error,
+  loaded,
   adminOperators,
   fetchAdminOperators,
   count,
   rowsPerPage = 10,
 }) => {
-  const [currentPage, setCurrentPage] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
-    fetchAdminOperators(currentPage + 1, rowsPerPage)
+    fetchAdminOperators(currentPage, rowsPerPage)
   }, [rowsPerPage, currentPage, fetchAdminOperators])
 
   return (
@@ -75,13 +73,12 @@ export const Index: React.FC<Props> = ({
         <Title>Endorsed Operators</Title>
 
         <List
-          loading={loading}
-          error={error}
+          loaded={loaded}
           currentPage={currentPage}
           operators={adminOperators}
           count={count}
           onChangePage={(_, page) => {
-            setCurrentPage(page)
+            setCurrentPage(page + 1)
           }}
         />
       </Grid>
@@ -109,8 +106,7 @@ const mapStateToProps: MapStateToProps<
   return {
     adminOperators: adminOperatorsSelector(state),
     count: state.adminOperatorsIndex.count,
-    loading: state.adminOperators.loading,
-    error: state.adminOperators.error,
+    loaded: state.adminOperatorsIndex.loaded,
   }
 }
 

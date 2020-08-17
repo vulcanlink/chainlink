@@ -1,10 +1,10 @@
-import { Button, Drawer } from 'antd'
-import { FeedConfig } from 'config'
 import React, { useEffect, useState } from 'react'
+import { Drawer, Button } from 'antd'
 import { connect } from 'react-redux'
-import { AppState } from 'state'
 import { networkGraphOperations } from 'state/ducks/networkGraph'
-import { etherscanAddress, humanizeUnixTimestamp } from 'utils'
+import { etherscanAddress, humanizeUnixTimestamp, Networks } from 'utils'
+import { FeedConfig } from 'feeds'
+import { AppState } from 'state'
 
 interface OwnProps {
   config: FeedConfig
@@ -191,15 +191,17 @@ const ContractDetailsContent: React.FC<ContractDetailsContentProps> = ({
 
       <div>
         <h4>Find out more in:</h4>
-        <Button style={{ marginRight: 10 }} ghost type="primary">
-          <a
-            target="_BLANK"
-            rel="noopener noreferrer"
-            href={`https://explorer.chain.link/job-runs?search=${config.contractAddress}`}
-          >
-            Chainlink Explorer
-          </a>
-        </Button>
+        {config.networkId === Networks.MAINNET && (
+          <Button style={{ marginRight: 10 }} ghost type="primary">
+            <a
+              target="_BLANK"
+              rel="noopener noreferrer"
+              href={`https://explorer.chain.link/job-runs?search=${config.contractAddress}`}
+            >
+              Chainlink Explorer
+            </a>
+          </Button>
+        )}
         <Button ghost type="primary">
           <a
             target="_BLANK"

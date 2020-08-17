@@ -1,51 +1,59 @@
+import { groups, answer } from './selectors'
 import { partialAsFull } from '@chainlink/ts-helpers/src'
-import { feedGroups, answer, answerTimestamp } from './selectors'
-import { FeedConfig } from 'config'
+import { FeedConfig } from 'feeds'
 import { AppState } from 'state/reducers'
+import { ListingAnswer } from 'state/ducks/listing/operations'
 import { HealthCheck } from 'state/ducks/listing/reducers'
 
-const feedA = partialAsFull<FeedConfig>({
+const feed1 = partialAsFull<FeedConfig>({
   contractAddress: 'A',
+  listing: true,
   pair: ['BTC', 'USD'],
 })
-const feedB = partialAsFull<FeedConfig>({
+const feed2 = partialAsFull<FeedConfig>({
   contractAddress: 'B',
+  listing: true,
   pair: ['BTC', 'ETH'],
 })
-const feedC = partialAsFull<FeedConfig>({
+const feed3 = partialAsFull<FeedConfig>({
   contractAddress: 'C',
+  listing: false,
+  pair: ['XBT', 'USD'],
+})
+const feed4 = partialAsFull<FeedConfig>({
+  contractAddress: 'D',
+  listing: true,
   pair: ['FTSE', 'GBP'],
 })
-const listedFeeds = [feedA, feedB, feedC]
+const feeds = [feed1, feed2, feed3, feed4]
 
 describe('state/ducks/listing/selectors', () => {
-  describe('feedGroups', () => {
+  describe('groups', () => {
     it('returns a Fiat & ETH listing group', () => {
-      const selected = feedGroups.resultFunc([])
+      const selected = groups.resultFunc([])
       expect(selected).toHaveLength(2)
       expect(selected[0].name).toMatch('Fiat')
       expect(selected[1].name).toMatch('ETH')
     })
 
     it('returns a list of feed configs grouped by quote asset', () => {
-      const selected = feedGroups.resultFunc(listedFeeds)
+      const selected = groups.resultFunc(feeds)
 
       const group1 = selected[0]
       expect(group1.feeds.length).toEqual(2)
-      expect(group1.feeds[0].contractAddress).toEqual(feedA.contractAddress)
-      expect(group1.feeds[1].contractAddress).toEqual(feedC.contractAddress)
+      expect(group1.feeds[0].contractAddress).toEqual(feed1.contractAddress)
+      expect(group1.feeds[1].contractAddress).toEqual(feed4.contractAddress)
 
       const group2 = selected[1]
       expect(group2.feeds.length).toEqual(1)
-      expect(group2.feeds[0].contractAddress).toEqual(feedB.contractAddress)
+      expect(group2.feeds[0].contractAddress).toEqual(feed2.contractAddress)
     })
   })
 
   describe('answer', () => {
     const feedA = partialAsFull<FeedConfig>({ contractAddress: 'A' })
-    const answers: Record<FeedConfig['contractAddress'], string> = {
-      [feedA.contractAddress]: '10.1',
-    }
+    const answerA: ListingAnswer = { answer: '10.1', config: feedA }
+    const answers: ListingAnswer[] = [answerA]
     const healthChecks: Record<string, HealthCheck> = {}
     const listingState = partialAsFull<AppState['listing']>({
       answers,
@@ -56,34 +64,11 @@ describe('state/ducks/listing/selectors', () => {
     })
 
     it('returns the answer for the contract', () => {
-      expect(answer(state, 'A')).toEqual('10.1')
+      expect(answer(state, 'A')).toEqual(answerA)
     })
 
     it('returns undefined when there is no answer for the contract', () => {
       expect(answer(state, 'B')).toBeUndefined()
-    })
-  })
-
-  describe('answer timestamp', () => {
-    const feedA = partialAsFull<FeedConfig>({ contractAddress: 'A' })
-    const answersTimestamp: Record<FeedConfig['contractAddress'], number> = {
-      [feedA.contractAddress]: 1,
-    }
-    const healthChecks: Record<string, HealthCheck> = {}
-    const listingState = partialAsFull<AppState['listing']>({
-      answersTimestamp,
-      healthChecks,
-    })
-    const state = partialAsFull<AppState>({
-      listing: listingState,
-    })
-
-    it('returns the timestamp for the contract', () => {
-      expect(answerTimestamp(state, 'A')).toEqual(1)
-    })
-
-    it('returns undefined when there is no answer timestamp for the contract', () => {
-      expect(answerTimestamp(state, 'B')).toBeUndefined()
     })
   })
 })

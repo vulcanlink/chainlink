@@ -3,9 +3,9 @@ package services
 import (
 	"time"
 
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/store"
-	"github.com/smartcontractkit/chainlink/core/store/orm"
+	"chainlink/core/logger"
+	"chainlink/core/store"
+	"chainlink/core/store/orm"
 )
 
 type storeReaper struct {
@@ -22,9 +22,8 @@ func NewStoreReaper(store *store.Store) SleeperTask {
 }
 
 func (sr *storeReaper) Work() {
-	recordCreationStaleThreshold := sr.config.ReaperExpiration().Before(
-		sr.config.SessionTimeout().Before(time.Now()))
-	err := sr.store.DeleteStaleSessions(recordCreationStaleThreshold)
+	offset := time.Now().Add(-sr.config.ReaperExpiration()).Add(-sr.config.SessionTimeout())
+	err := sr.store.DeleteStaleSessions(offset)
 	if err != nil {
 		logger.Error("unable to reap stale sessions: ", err)
 	}

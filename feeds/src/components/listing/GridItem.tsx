@@ -1,134 +1,163 @@
-import { DispatchBinding } from '@chainlink/ts-helpers'
-import React, { useEffect } from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { connect, MapStateToProps } from 'react-redux'
-import { Col } from 'antd'
+import { Col, Popover, Tooltip } from 'antd'
 import classNames from 'classnames'
-import { FeedConfig } from 'config'
 import { AppState } from 'state'
-import { listingSelectors, listingOperations } from '../../state/ducks/listing'
+import { FeedConfig } from 'feeds'
+import { listingSelectors } from '../../state/ducks/listing'
+import { ListingAnswer } from 'state/ducks/listing/operations'
 import { HealthCheck } from 'state/ducks/listing/reducers'
-import Sponsors from './Sponsors'
-import { Details } from './Details'
-import { humanizeUnixTimestamp } from '../../utils'
 
 interface StateProps {
   healthCheck?: HealthCheck
-  answer?: string
-  answerTimestamp?: number
+  listingAnswer?: ListingAnswer
 }
 
 interface OwnProps {
   feed: FeedConfig
-  enableDetails: boolean
+  compareOffchain: boolean
+  enableHealth: boolean
 }
 
-interface DispatchProps {
-  fetchLatestData: DispatchBinding<typeof listingOperations.fetchLatestData>
-  fetchHealthStatus: DispatchBinding<typeof listingOperations.fetchHealthStatus>
-}
-
-interface Props extends OwnProps, StateProps, DispatchProps {}
+interface Props extends StateProps, OwnProps {}
 
 const GRID = { xs: 24, sm: 12, md: 8 }
 
 export const GridItem: React.FC<Props> = ({
   feed,
-  answer,
-  answerTimestamp,
+  listingAnswer,
+  compareOffchain,
+  enableHealth,
   healthCheck,
-  enableDetails,
-  fetchLatestData,
-  fetchHealthStatus,
 }) => {
-  useEffect(() => {
-    fetchLatestData(feed)
-  }, [fetchLatestData, feed])
-
-  useEffect(() => {
-    if (enableDetails) {
-      fetchHealthStatus(feed)
-    }
-  }, [enableDetails, fetchHealthStatus, feed])
-
-  const healthCheckStatus = normalizeStatus(feed, answer, healthCheck)
-
-  const classes = classNames('listing-grid__item', {
-    [`listing-grid__item--health listing-grid__item--health-${healthClasses(
-      healthCheckStatus,
-    )}`]: enableDetails,
-  })
-
+  const status = normalizeStatus(feed, listingAnswer, healthCheck)
+  const tooltipErrors = status.errors.join(', ')
+  const title = `${status.result}${tooltipErrors}`
+  const classes = classNames(
+    'listing-grid__item',
+    healthClasses(status, enableHealth),
+  )
   const gridItem = (
     <div className={classes}>
+      {compareOffchain && <CompareOffchain feed={feed} />}
       <Link
         to={feed.path}
         onClick={scrollToTop}
         className="listing-grid__item--link"
       >
-        <div className="listing-grid__item--details-icon">
-          {enableDetails && (
-            <Details
-              feed={feed}
-              healthCheckPrice={healthCheck?.currentPrice}
-              healthCheckStatus={healthCheckStatus}
-              answer={answer}
-              answerTimestamp={answerTimestamp}
-              healthClasses={healthClasses(healthCheckStatus)}
-            />
-          )}
-        </div>
         <div className="listing-grid__item--name">{feed.name}</div>
         <div className="listing-grid__item--answer">
-          {answer && (
+          {listingAnswer && (
             <>
-              {feed.valuePrefix} {answer}
+              {feed.valuePrefix} {listingAnswer.answer}
             </>
           )}
-          {enableDetails && answerTimestamp && (
-            <div> {humanizeUnixTimestamp(answerTimestamp, 'LLL')}</div>
-          )}
         </div>
-        <Sponsors sponsors={feed.sponsored} />
+        {feed.sponsored && feed.sponsored.length > 0 && (
+          <>
+            <div className="listing-grid__item--sponsored-title">
+              Sponsored by
+            </div>
+            <div className="listing-grid__item--sponsored">
+              <Sponsored data={feed.sponsored} />
+            </div>
+          </>
+        )}
       </Link>
     </div>
   )
 
-  return <Col {...GRID}>{gridItem}</Col>
+  return (
+    <Col {...GRID}>
+      {enableHealth ? <Tooltip title={title}>{gridItem}</Tooltip> : gridItem}
+    </Col>
+  )
+}
+
+interface CompareOffchainProps {
+  feed: FeedConfig
+}
+
+function CompareOffchain({ feed }: CompareOffchainProps) {
+  let content: any = 'No offchain comparison'
+
+  if (feed.compareOffchain) {
+    content = (
+      <a href={feed.compareOffchain} rel="noopener noreferrer">
+        Compare Offchain
+      </a>
+    )
+  }
+
+  return (
+    <div className="listing-grid__item--offchain-comparison">{content}</div>
+  )
+}
+
+function Sponsored({ data }: any) {
+  const [sliced] = useState(data.slice(0, 2))
+
+  if (data.length <= 2) {
+    return sliced.map((name: any, i: number) => [
+      i > 0 && ', ',
+      <span key={name}>{name}</span>,
+    ])
+  }
+
+  return (
+    <Popover
+      content={data.map((name: any) => (
+        <div className="listing-grid__item--sponsored-popover" key={name}>
+          {name}
+        </div>
+      ))}
+      title="Sponsored by"
+    >
+      {sliced.map((name: any, i: number) => [
+        i > 0 && ', ',
+        <span key={name}>{name}</span>,
+      ])}
+      , (+{data.length - 2})
+    </Popover>
+  )
 }
 
 function scrollToTop() {
   window.scrollTo(0, 0)
 }
 
-export interface Status {
+interface Status {
   result: string
   errors: string[]
 }
 
-function healthClasses(status: Status) {
-  if (status.result === 'Unknown') {
-    return 'unknown'
+function healthClasses(status: Status, enableHeath: boolean) {
+  if (!enableHeath) {
+    return
   }
-  if (status.result === 'Error') {
-    return 'error'
+  if (status.result === 'unknown') {
+    return 'listing-grid__item--health-unknown'
+  }
+  if (status.result === 'error') {
+    return 'listing-grid__item--health-error'
   }
 
-  return 'ok'
+  return 'listing-grid__item--health-ok'
 }
 
 function normalizeStatus(
   feed: FeedConfig,
-  rawAnswer?: string,
+  listingAnswer?: ListingAnswer,
   healthCheck?: HealthCheck,
 ): Status {
   const errors: string[] = []
 
-  if (rawAnswer === undefined || healthCheck === undefined) {
-    return { result: 'Unknown', errors }
+  if (listingAnswer === undefined || healthCheck === undefined) {
+    return { result: 'unknown', errors }
   }
 
-  const answer = parseFloat(rawAnswer ?? '0')
+  const answer = parseFloat(listingAnswer.answer)
   const thresholdDiff = healthCheck.currentPrice * (feed.threshold / 100)
   const thresholdMin = Math.max(healthCheck.currentPrice - thresholdDiff, 0)
   const thresholdMax = healthCheck.currentPrice + thresholdDiff
@@ -139,14 +168,14 @@ function normalizeStatus(
   }
   if (!withinThreshold) {
     errors.push(
-      `Reference contract price is not within threshold ${thresholdMin} - ${thresholdMax}`,
+      `reference contract price is not within threshold ${thresholdMin} - ${thresholdMax}`,
     )
   }
 
   if (errors.length === 0) {
-    return { result: `OK. Within ${feed.threshold}% threshold`, errors }
+    return { result: 'ok', errors }
   } else {
-    return { result: 'Error', errors }
+    return { result: 'error', errors }
   }
 }
 
@@ -155,23 +184,13 @@ const mapStateToProps: MapStateToProps<StateProps, OwnProps, AppState> = (
   ownProps,
 ) => {
   const contractAddress = ownProps.feed.contractAddress
-  const answer = listingSelectors.answer(state, contractAddress)
-  const answerTimestamp = listingSelectors.answerTimestamp(
-    state,
-    contractAddress,
-  )
+  const listingAnswer = listingSelectors.answer(state, contractAddress)
   const healthCheck = state.listing.healthChecks[contractAddress]
 
   return {
-    answer,
-    answerTimestamp,
+    listingAnswer,
     healthCheck,
   }
 }
 
-const mapDispatchToProps = {
-  fetchLatestData: listingOperations.fetchLatestData,
-  fetchHealthStatus: listingOperations.fetchHealthStatus,
-}
-
-export default connect(mapStateToProps, mapDispatchToProps)(GridItem)
+export default connect(mapStateToProps)(GridItem)

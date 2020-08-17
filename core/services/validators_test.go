@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/core/adapters"
-	"github.com/smartcontractkit/chainlink/core/assets"
-	"github.com/smartcontractkit/chainlink/core/internal/cltest"
-	"github.com/smartcontractkit/chainlink/core/services"
-	"github.com/smartcontractkit/chainlink/core/store/models"
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"chainlink/core/adapters"
+	"chainlink/core/assets"
+	"chainlink/core/internal/cltest"
+	"chainlink/core/services"
+	"chainlink/core/store/models"
+	"chainlink/core/utils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,11 +64,6 @@ func TestValidateJob(t *testing.T) {
 			"runlog and ethtx with a function selector",
 			cltest.MustReadFile(t, "testdata/runlog_ethtx_w_funcselector_job.json"),
 			models.NewJSONAPIErrorsWith("Cannot set EthTx Task's function selector parameter with a RunLog Initiator"),
-		},
-		{
-			"runlog and ethtx with a fromAddress that doesn't match one of our keys",
-			cltest.MustReadFile(t, "testdata/runlog_ethtx_w_missing_fromAddress_job.json"),
-			models.NewJSONAPIErrorsWith("Cannot set EthTx Task's fromAddress parameter: the node does not have this private key in the database"),
 		},
 		{
 			"runlog with two ethtx tasks",
@@ -128,7 +123,7 @@ func TestValidateBridgeType(t *testing.T) {
 				Name: "invalid/adapter",
 				URL:  cltest.WebURL(t, "https://denergy.eth"),
 			},
-			models.NewJSONAPIErrorsWith("task type validation: name invalid/adapter contains invalid characters"),
+			models.NewJSONAPIErrorsWith("Task Type validation: name invalid/adapter contains invalid characters"),
 		},
 		{
 			"invalid with blank url",
@@ -173,14 +168,6 @@ func TestValidateBridgeType(t *testing.T) {
 			models.NewJSONAPIErrorsWith("MinimumContractPayment must be positive"),
 		},
 		{
-			"existing core adapter",
-			models.BridgeTypeRequest{
-				Name: "ethtx",
-				URL:  cltest.WebURL(t, "https://denergy.eth"),
-			},
-			models.NewJSONAPIErrorsWith("Bridge Type ethtx is a native adapter"),
-		},
-		{
 			"new external adapter",
 			models.BridgeTypeRequest{
 				Name: "gdaxprice",
@@ -209,12 +196,33 @@ func TestValidateBridgeNotExist(t *testing.T) {
 	bt.URL = cltest.WebURL(t, "https://denergy.eth")
 	assert.NoError(t, store.CreateBridgeType(&bt))
 
-	newBridge := models.BridgeTypeRequest{
-		Name: "solargridreporting",
+	tests := []struct {
+		description string
+		request     models.BridgeTypeRequest
+		want        error
+	}{
+		{
+			"existing external adapter",
+			models.BridgeTypeRequest{
+				Name: "solargridreporting",
+			},
+			models.NewJSONAPIErrorsWith("Bridge Type solargridreporting already exists"),
+		},
+		{
+			"existing core adapter",
+			models.BridgeTypeRequest{
+				Name: "ethtx",
+			},
+			models.NewJSONAPIErrorsWith("Bridge Type ethtx already exists"),
+		},
 	}
-	expected := models.NewJSONAPIErrorsWith("Bridge Type solargridreporting already exists")
-	result := services.ValidateBridgeTypeNotExist(&newBridge, store)
-	assert.Equal(t, expected, result)
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			result := services.ValidateBridgeTypeNotExist(&test.request, store)
+			assert.Equal(t, test.want, result)
+		})
+	}
 }
 
 func TestValidateExternalInitiator(t *testing.T) {
@@ -283,8 +291,7 @@ func TestValidateInitiator(t *testing.T) {
 		{"runat w/o time", `{"type":"runat"}`, true},
 		{"runat w time before start at", fmt.Sprintf(`{"type":"runat","params": {"time":"%v"}}`, startAt.Add(-1*time.Second).Unix()), true},
 		{"runat w time after end at", fmt.Sprintf(`{"type":"runat","params": {"time":"%v"}}`, endAt.Add(time.Second).Unix()), true},
-		{"cron standard", `{"type":"cron","params": {"schedule":"CRON_TZ=UTC * * * * *"}}`, false},
-		{"cron with 6 fields", `{"type":"cron","params": {"schedule":"CRON_TZ=UTC * * * * * *"}}`, false},
+		{"cron", `{"type":"cron","params": {"schedule":"* * * * * *"}}`, false},
 		{"cron w/o schedule", `{"type":"cron"}`, true},
 		{"external w/o name", `{"type":"external"}`, true},
 		{"non-existent initiator", `{"type":"doesntExist"}`, true},
@@ -372,14 +379,10 @@ const validInitiator = `{
 			"https://lambda.staging.devnet.tools/cc/call",
 			"https://lambda.staging.devnet.tools/cmc/call"
 		],
-		"idleTimer": {
-			"duration": "1m"
-		},
-		"pollTimer": {
-			"period": "1m"
-		},
+		"idleThreshold": "1m",
 		"threshold": 0.5,
-		"precision": 2
+		"precision": 2,
+		"pollingInterval": "1m"
 	}
 }`
 
@@ -410,11 +413,11 @@ func TestValidateInitiator_FluxMonitorErrors(t *testing.T) {
 		{"address", cltest.MustJSONDel(t, validInitiator, "params.address")},
 		{"feeds", cltest.MustJSONSet(t, validInitiator, "params.feeds", []string{})},
 		{"threshold", cltest.MustJSONDel(t, validInitiator, "params.threshold")},
-		{"must be positive", cltest.MustJSONSet(t, validInitiator, "params.threshold", -5)},
+		{"threshold", cltest.MustJSONSet(t, validInitiator, "params.threshold", -5)},
 		{"requestdata", cltest.MustJSONDel(t, validInitiator, "params.requestdata")},
-		{"pollTimer enabled, but no period specified", cltest.MustJSONDel(t, validInitiator, "params.pollTimer.period")},
-		{"period must be equal or greater than 15s", cltest.MustJSONSet(t, validInitiator, "params.pollTimer.period", "1s")},
-		{"idleTimer.duration must be >= than pollTimer.period", cltest.MustJSONSet(t, validInitiator, "params.idleTimer.duration", "30s")},
+		{"pollingInterval", cltest.MustJSONDel(t, validInitiator, "params.pollingInterval")},
+		{"pollingInterval", cltest.MustJSONSet(t, validInitiator, "params.pollingInterval", "1s")},
+		{"idleThreshold", cltest.MustJSONSet(t, validInitiator, "params.idleThreshold", "30s")},
 	}
 	for _, test := range tests {
 		t.Run("bad "+test.Field, func(t *testing.T) {
@@ -425,22 +428,6 @@ func TestValidateInitiator_FluxMonitorErrors(t *testing.T) {
 			assert.Contains(t, err.Error(), test.Field)
 		})
 	}
-}
-
-func TestValidateInitiator_FluxMonitor_EthereumDisabled(t *testing.T) {
-	t.Parallel()
-
-	config, cleanup := cltest.NewConfig(t)
-	defer cleanup()
-	config.Config.Set("ETH_DISABLED", true)
-	store, cleanup := cltest.NewStoreWithConfig(config)
-	defer cleanup()
-
-	job := cltest.NewJob()
-	var initr models.Initiator
-	require.NoError(t, json.Unmarshal([]byte(validInitiator), &initr))
-	err := services.ValidateInitiator(initr, job, store)
-	require.Error(t, err)
 }
 
 func TestValidateInitiator_FeedsHappy(t *testing.T) {
@@ -481,9 +468,7 @@ func TestValidateInitiator_FeedsErrors(t *testing.T) {
 		FeedsJSON   string
 	}{
 		{"invalid url", `["invalid/url"]`},
-		{"invalid bridge name", `[{"bridge": "doesnotexist"}]`},
-		{"invalid url type", `[1]`},
-		{"invalid bridge type", `[{"bridge": 1}]`},
+		{"invalid bridge", `[{"bridge": "doesnotexist"}]`},
 		{"valid url, invalid bridge", `["http://example.com", {"bridge": "doesnotexist"}]`},
 		{"invalid url, valid bridge", `["invalid/url", {"bridge": "testbridge"}]`},
 		{"missing bridge", `[{"bridgeName": "doesnotexist"}]`},

@@ -1,5 +1,4 @@
-import { Reducer } from 'redux'
-import { SET_TOOLTIP, SET_DRAWER, NetworkGraphActionTypes } from './types'
+import { Actions } from 'state/actions'
 
 export interface State {
   tooltip: null | any
@@ -11,18 +10,15 @@ export const INITIAL_STATE: State = {
   drawer: null,
 }
 
-const reducer: Reducer<State, NetworkGraphActionTypes> = (
-  state = INITIAL_STATE,
-  action,
-) => {
+const reducer = (state: State = INITIAL_STATE, action: Actions) => {
   switch (action.type) {
-    case SET_TOOLTIP:
+    case 'networkGraph/SET_TOOLTIP':
       return {
         ...state,
         tooltip: action.payload,
       }
 
-    case SET_DRAWER:
+    case 'networkGraph/SET_DRAWER':
       return {
         ...state,
         drawer: action.payload,

@@ -1,13 +1,38 @@
 import React from 'react'
 
 import { Row, Col, Button } from 'antd'
+import white from 'assets/sponsors/white.png'
+import CyberRepublic from 'assets/sponsors/cyberrepublic.png'
+
 import ReactGA from 'react-ga'
-import { sponsorList, SponsorListItem } from '../../assets/sponsors'
+
+interface Sponsor {
+  name: string
+  url: string
+  src: string
+}
 
 const grid = { xs: 24, sm: 12, md: 8 }
+const list: Sponsor[] = [
+  {
+    name: 'CyberRepublic',
+    url: 'https://www.cyberrepublic.org/',
+    src: CyberRepublic
+  },
+  {
+    name: '',
+    url: '#',
+    src: white,
+  },
+  {
+    name: '',
+    url: '#',
+    src: white,
+  }
+]
 
 interface LogoProps {
-  item: SponsorListItem
+  item: Sponsor
 }
 
 const Logo: React.FC<LogoProps> = ({ item }) => (
@@ -20,7 +45,7 @@ const Logo: React.FC<LogoProps> = ({ item }) => (
     <img
       alt={item.name}
       title={item.name}
-      src={item.imageLg}
+      src={item.src}
       className={item.name}
     />
   </a>
@@ -51,7 +76,7 @@ const SponsorsLogos = () => (
     <h3>Used and Sponsored By</h3>
     <div className="logos">
       <Row gutter={18} type="flex" justify="space-around">
-        {sponsorList.map((sponsor: SponsorListItem, i: number) => (
+        {list.map((sponsor: Sponsor, i: number) => (
           <Col key={i} {...grid}>
             <Logo item={sponsor} />
           </Col>

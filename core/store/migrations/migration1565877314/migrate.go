@@ -3,9 +3,9 @@ package migration1565877314
 import (
 	"net/url"
 
-	"github.com/smartcontractkit/chainlink/core/store/migrations/migration0"
-	"github.com/smartcontractkit/chainlink/core/store/models"
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"chainlink/core/store/migrations/migration0"
+	"chainlink/core/store/models"
+	"chainlink/core/utils"
 
 	"github.com/jinzhu/gorm"
 	"github.com/pkg/errors"

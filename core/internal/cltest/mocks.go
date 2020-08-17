@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -19,22 +18,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/core/cmd"
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/services/chainlink"
-	"github.com/smartcontractkit/chainlink/core/services/eth"
-	"github.com/smartcontractkit/chainlink/core/store"
-	"github.com/smartcontractkit/chainlink/core/store/models"
-	"github.com/smartcontractkit/chainlink/core/store/orm"
+	"chainlink/core/cmd"
+	"chainlink/core/eth"
+	"chainlink/core/logger"
+	"chainlink/core/services/chainlink"
+	"chainlink/core/store"
+	"chainlink/core/store/models"
+	"chainlink/core/store/orm"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/onsi/gomega"
-	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,51 +40,38 @@ const LenientEthMock = "lenient"
 // and returns the store.config.ChainID
 const EthMockRegisterChainID = "eth_mock_register_chain_id"
 
-// EthMockRegisterGetBalance registers eth_getBalance, which is called by the BalanceMonitor
-const EthMockRegisterGetBalance = "eth_mock_register_get_balance"
+// NoRegisterGetBlockNumber prevents the EthMock from expecting to have eth_blockNumber
+// called by the LogBroadcaster at application startup.  Most of our tests should expect
+// this, so this flag should not be used frequently.
+const NoRegisterGetBlockNumber = "no_register_get_block_number"
 
-// EthMockRegisterGetBlockByNumber registers eth_getBlockByNumber, which is called by the HeadTracker
-const EthMockRegisterGetBlockByNumber = "eth_mock_register_get_block_by_number"
+// MockCallerSubscriberClient create new EthMock Client
+func (ta *TestApplication) MockCallerSubscriberClient(flags ...string) *EthMock {
+	if ta.ChainlinkApplication.HeadTracker.Connected() {
+		logger.Panic("Cannot mock eth client after being connected")
+	}
+	return MockEthOnStore(ta.t, ta.Store, flags...)
+}
 
 // MockEthOnStore given store return new EthMock Client
-func MockEthOnStore(t testing.TB, s *store.Store, flagsAndDependencies ...interface{}) *EthMock {
-	mock := &EthMock{
-		t:                 t,
-		strict:            true,
-		chainID:           s.Config.ChainID(),
-		OptionalResponses: make(map[string]MockResponse),
-	}
-	var ethClient eth.Client
-	for _, flag := range flagsAndDependencies {
+func MockEthOnStore(t testing.TB, s *store.Store, flags ...string) *EthMock {
+	mock := &EthMock{t: t, strict: true}
+	registerGetBlockNumber := true
+	for _, flag := range flags {
 		if flag == LenientEthMock {
 			mock.strict = false
 		} else if flag == EthMockRegisterChainID {
-			mock.RegisterOptional("eth_chainId", s.Config.ChainID())
-		} else if flag == EthMockRegisterGetBalance {
-			mock.RegisterOptional("eth_getBalance", "0x100000")
-		} else if flag == EthMockRegisterGetBlockByNumber {
-			mock.RegisterOptional("eth_getBlockByNumber", MockResultFunc(func(args ...interface{}) interface{} {
-				n, err := hexutil.DecodeBig(args[0].(string))
-				require.NoError(t, err)
-				return Head(n.Int64())
-			}))
-		} else if flag == AllowUnstarted {
-			// no-op, handled in cltest.NewApplication
-		} else {
-			switch dep := flag.(type) {
-			case eth.Client:
-				ethClient = dep
-			default:
-				t.Fatalf("unknown dependency: (%T) %+v", flag, flag)
-			}
+			mock.Register("eth_chainId", s.Config.ChainID())
+		} else if flag == NoRegisterGetBlockNumber {
+			registerGetBlockNumber = false
 		}
 	}
-	if ethClient == nil {
-		ethClient = eth.NewClientWith(mock, mock)
+	if registerGetBlockNumber {
+		mock.Register("eth_blockNumber", hexutil.Uint64(1))
 	}
-	s.EthClient = ethClient
+	eth := &eth.CallerSubscriberClient{CallerSubscriber: mock}
 	if txm, ok := s.TxManager.(*store.EthTxManager); ok {
-		txm.Client = ethClient
+		txm.Client = eth
 	} else {
 		log.Panic("MockEthOnStore only works on EthTxManager")
 	}
@@ -99,16 +80,19 @@ func MockEthOnStore(t testing.TB, s *store.Store, flagsAndDependencies ...interf
 
 // EthMock is a mock ethereum client
 type EthMock struct {
-	Responses         []MockResponse
-	OptionalResponses map[string]MockResponse
-	Subscriptions     []*MockSubscription
-	newHeadsCalled    bool
-	logsCalled        bool
-	mutex             sync.RWMutex
-	context           string
-	strict            bool
-	t                 testing.TB
-	chainID           *big.Int
+	Responses      []MockResponse
+	Subscriptions  []*MockSubscription
+	newHeadsCalled bool
+	logsCalled     bool
+	mutex          sync.RWMutex
+	context        string
+	strict         bool
+	t              testing.TB
+}
+
+// Dial mock dial
+func (mock *EthMock) Dial(url string) (eth.CallerSubscriber, error) {
+	return mock, nil
 }
 
 // Context adds helpful context to EthMock values set in the callback function.
@@ -157,17 +141,6 @@ func (mock *EthMock) Register(
 	mock.Responses = append(mock.Responses, res)
 }
 
-func (mock *EthMock) RegisterOptional(method string, response interface{}) {
-	res := MockResponse{
-		methodName: method,
-		response:   response,
-		context:    mock.context,
-	}
-	mock.mutex.Lock()
-	defer mock.mutex.Unlock()
-	mock.OptionalResponses[method] = res
-}
-
 // RegisterError register mock errors to EthMock
 func (mock *EthMock) RegisterError(method, errMsg string) {
 	res := MockResponse{
@@ -214,12 +187,8 @@ func (mock *EthMock) AssertAllCalled() {
 	assert.Empty(mock.t, mock.Remaining())
 }
 
-func (mock *EthMock) Call(result interface{}, method string, args ...interface{}) error {
-	return mock.CallContext(context.Background(), result, method, args...)
-}
-
 // Call will call given method and set the result
-func (mock *EthMock) CallContext(_ context.Context, result interface{}, method string, args ...interface{}) error {
+func (mock *EthMock) Call(result interface{}, method string, args ...interface{}) error {
 	mock.mutex.Lock()
 	defer mock.mutex.Unlock()
 
@@ -231,12 +200,7 @@ func (mock *EthMock) CallContext(_ context.Context, result interface{}, method s
 				return fmt.Errorf(resp.errMsg)
 			}
 
-			realResponse := resp.response
-			if respFunc, ok := resp.response.(MockResultFunc); ok {
-				realResponse = respFunc(args...)
-			}
-
-			if err := assignResult(result, realResponse); err != nil {
+			if err := assignResult(result, resp.response); err != nil {
 				return err
 			}
 
@@ -250,14 +214,6 @@ func (mock *EthMock) CallContext(_ context.Context, result interface{}, method s
 		}
 	}
 
-	if resp, exists := mock.OptionalResponses[method]; exists {
-		realResponse := resp.response
-		if respFunc, ok := resp.response.(MockResultFunc); ok {
-			realResponse = respFunc(args...)
-		}
-		return assignResult(result, realResponse)
-	}
-
 	err := fmt.Errorf("EthMock: Method %v not registered", method)
 	if mock.strict {
 		mock.t.Errorf("%s\n%s", err, debug.Stack())
@@ -265,32 +221,10 @@ func (mock *EthMock) CallContext(_ context.Context, result interface{}, method s
 	return err
 }
 
-func (mock *EthMock) BatchCallContext(ctx context.Context, elems []rpc.BatchElem) error {
-	for _, elem := range elems {
-		err := mock.CallContext(ctx, elem.Result, elem.Method, elem.Args...)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-type MockResultFunc func(args ...interface{}) interface{}
-
 // assignResult attempts to mimick more closely how go-ethereum actually does
 // Call, falling back to reflection if the values dont support the required
 // encoding interfaces
-func assignResult(result, response interface{}) (err error) {
-	defer func() {
-		if perr := recover(); perr != nil {
-			switch perr := perr.(type) {
-			case string:
-				err = errors.New(perr)
-			case error:
-				err = perr
-			}
-		}
-	}()
+func assignResult(result, response interface{}) error {
 	if unmarshaler, ok := result.(encoding.TextUnmarshaler); ok {
 		switch resp := response.(type) {
 		case encoding.TextMarshaler:
@@ -334,189 +268,68 @@ func (mock *EthMock) RegisterSubscription(name string, channels ...interface{}) 
 func channelFromSubscriptionName(name string) interface{} {
 	switch name {
 	case "logs":
-		return make(chan gethTypes.Log)
+		return make(chan eth.Log)
 	case "newHeads":
-		return make(chan *models.Head)
+		return make(chan eth.BlockHeader)
 	default:
 		return make(chan struct{})
 	}
 }
 
-// SubscribeFilterLogs registers a log subscription to the channel
-func (mock *EthMock) SubscribeFilterLogs(
+// Subscribe registers a subscription to the channel
+func (mock *EthMock) Subscribe(
 	ctx context.Context,
-	q ethereum.FilterQuery,
-	channel chan<- gethTypes.Log,
-) (ethereum.Subscription, error) {
+	channel interface{},
+	args ...interface{},
+) (eth.Subscription, error) {
 	mock.mutex.Lock()
 	defer mock.mutex.Unlock()
 	for i, sub := range mock.Subscriptions {
-		if sub.name == "logs" {
+		if sub.name == args[0] {
 			mock.Subscriptions = append(mock.Subscriptions[:i], mock.Subscriptions[i+1:]...)
-			fwdLogs(channel, sub.channel)
+			switch channel.(type) {
+			case chan<- eth.Log:
+				fwdLogs(channel, sub.channel)
+			case chan<- eth.BlockHeader:
+				fwdHeaders(channel, sub.channel)
+			default:
+				return nil, errors.New("Channel type not supported by ethMock")
+			}
 			return sub, nil
 		}
 	}
-	if !mock.logsCalled {
-		mock.logsCalled = true
-		return &MockSubscription{
-			channel: make(chan gethTypes.Log),
-			Errors:  make(chan error),
-		}, nil
-	}
-	return nil, errors.New("must RegisterSubscription before SubscribeFilterLogs")
-}
-
-// SubscribeNewHead registers a block head subscription to the channel
-func (mock *EthMock) SubscribeNewHead(
-	ctx context.Context,
-	channel chan<- *models.Head,
-) (ethereum.Subscription, error) {
-	mock.mutex.Lock()
-	defer mock.mutex.Unlock()
-	for i, sub := range mock.Subscriptions {
-		if sub.name == "newHeads" {
-			mock.Subscriptions = append(mock.Subscriptions[:i], mock.Subscriptions[i+1:]...)
-			fwdHeaders(channel, sub.channel)
-			return sub, nil
-		}
-	}
-	if !mock.newHeadsCalled {
+	if args[0] == "newHeads" && !mock.newHeadsCalled {
 		mock.newHeadsCalled = true
 		return EmptyMockSubscription(), nil
+	} else if args[0] == "logs" && !mock.logsCalled {
+		mock.logsCalled = true
+		return &MockSubscription{
+			channel: make(chan eth.Log),
+			Errors:  make(chan error),
+		}, nil
+	} else if args[0] == "newHeads" {
+		return nil, errors.New("newHeads subscription only expected once, please register another mock subscription if more are needed")
 	}
-	return nil, errors.New("newHeads subscription only expected once, please register another mock subscription if more are needed")
-}
-
-func (mock *EthMock) EthSubscribe(ctx context.Context, channel interface{}, args ...interface{}) (ethereum.Subscription, error) {
-	ch, ok := channel.(chan<- *models.Head)
-	if !ok {
-		panic("channel should be chan<- *models.Head")
-	}
-	if len(args) == 0 {
-		panic("args should contain 'newHeads'")
-	}
-	return mock.SubscribeNewHead(ctx, ch)
+	return nil, errors.New("Must RegisterSubscription before Subscribe")
 }
 
 // RegisterNewHeads registers a newheads subscription
-func (mock *EthMock) RegisterNewHeads() chan *models.Head {
-	newHeads := make(chan *models.Head, 10)
+func (mock *EthMock) RegisterNewHeads() chan eth.BlockHeader {
+	newHeads := make(chan eth.BlockHeader, 10)
 	mock.RegisterSubscription("newHeads", newHeads)
 	return newHeads
 }
 
 // RegisterNewHead register new head at given blocknumber
-func (mock *EthMock) RegisterNewHead(blockNumber int64) chan *models.Head {
+func (mock *EthMock) RegisterNewHead(blockNumber int64) chan eth.BlockHeader {
 	newHeads := mock.RegisterNewHeads()
-	newHeads <- &models.Head{
-		Hash:   NewHash(),
-		Number: blockNumber,
-	}
+	newHeads <- eth.BlockHeader{Number: BigHexInt(blockNumber)}
 	return newHeads
 }
 
-func (mock *EthMock) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
-	var result hexutil.Big
-	err := mock.CallContext(ctx, &result, "eth_getBalance", account, toBlockNumArg(blockNumber))
-	return (*big.Int)(&result), err
-}
-
-func (mock *EthMock) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]gethTypes.Log, error) {
-	var result []gethTypes.Log
-	arg, err := toFilterArg(q)
-	if err != nil {
-		return nil, err
-	}
-	err = mock.CallContext(ctx, &result, "eth_getLogs", arg)
-	return result, err
-}
-
-func (mock *EthMock) BlockByNumber(ctx context.Context, number *big.Int) (*gethTypes.Block, error) {
-	var block *gethTypes.Block
-	err := mock.CallContext(ctx, &block, "eth_getBlockByNumber", toBlockNumArg(number), false)
-	if err == nil && block == nil {
-		err = ethereum.NotFound
-	}
-	return block, err
-}
-
-func (mock *EthMock) HeaderByNumber(ctx context.Context, number *big.Int) (*gethTypes.Header, error) {
-	var head *gethTypes.Header
-	err := mock.CallContext(ctx, &head, "eth_getBlockByNumber", toBlockNumArg(number), false)
-	if err == nil && head == nil {
-		err = ethereum.NotFound
-	}
-	return head, err
-}
-
-func (mock *EthMock) PendingNonceAt(ctx context.Context, account common.Address) (uint64, error) {
-	var result hexutil.Uint64
-	err := mock.CallContext(ctx, &result, "eth_getTransactionCount", account, "pending")
-	return uint64(result), err
-}
-
-func (mock *EthMock) SendTransaction(ctx context.Context, tx *gethTypes.Transaction) error {
-	data, err := rlp.EncodeToBytes(tx)
-	if err != nil {
-		return err
-	}
-	return mock.CallContext(ctx, nil, "eth_sendRawTransaction", hexutil.Encode(data))
-}
-
-func (mock *EthMock) TransactionReceipt(ctx context.Context, txHash common.Hash) (*gethTypes.Receipt, error) {
-	var r *gethTypes.Receipt
-	err := mock.CallContext(ctx, &r, "eth_getTransactionReceipt", txHash)
-	if err == nil {
-		if r == nil {
-			return nil, ethereum.NotFound
-		}
-	}
-	return r, err
-}
-
-func (mock *EthMock) ChainID(ctx context.Context) (*big.Int, error) {
-	var result big.Int
-	err := mock.CallContext(ctx, &result, "eth_chainId")
-	if err != nil {
-		return nil, err
-	}
-	return &result, err
-}
-
-func (mock *EthMock) Close() {}
-
-func toFilterArg(q ethereum.FilterQuery) (interface{}, error) {
-	arg := map[string]interface{}{
-		"address": q.Addresses,
-		"topics":  q.Topics,
-	}
-	if q.BlockHash != nil {
-		arg["blockHash"] = *q.BlockHash
-		if q.FromBlock != nil || q.ToBlock != nil {
-			return nil, fmt.Errorf("cannot specify both BlockHash and FromBlock/ToBlock")
-		}
-	} else {
-		if q.FromBlock == nil {
-			arg["fromBlock"] = "0x0"
-		} else {
-			arg["fromBlock"] = toBlockNumArg(q.FromBlock)
-		}
-		arg["toBlock"] = toBlockNumArg(q.ToBlock)
-	}
-	return arg, nil
-}
-
-func toBlockNumArg(number *big.Int) string {
-	if number == nil {
-		return "latest"
-	}
-	return hexutil.EncodeBig(number)
-}
-
 func fwdLogs(actual, mock interface{}) {
-	logChan := actual.(chan<- gethTypes.Log)
-	mockChan := mock.(chan gethTypes.Log)
+	logChan := actual.(chan<- eth.Log)
+	mockChan := mock.(chan eth.Log)
 	go func() {
 		for e := range mockChan {
 			logChan <- e
@@ -525,8 +338,8 @@ func fwdLogs(actual, mock interface{}) {
 }
 
 func fwdHeaders(actual, mock interface{}) {
-	logChan := actual.(chan<- *models.Head)
-	mockChan := mock.(chan *models.Head)
+	logChan := actual.(chan<- eth.BlockHeader)
+	mockChan := mock.(chan eth.BlockHeader)
 	go func() {
 		for e := range mockChan {
 			logChan <- e
@@ -563,10 +376,10 @@ func (mes *MockSubscription) Unsubscribe() {
 	switch mes.channel.(type) {
 	case chan struct{}:
 		close(mes.channel.(chan struct{}))
-	case chan gethTypes.Log:
-		close(mes.channel.(chan gethTypes.Log))
-	case chan *models.Head:
-		close(mes.channel.(chan *models.Head))
+	case chan eth.Log:
+		close(mes.channel.(chan eth.Log))
+	case chan eth.BlockHeader:
+		close(mes.channel.(chan eth.BlockHeader))
 	default:
 		logger.Fatal(fmt.Sprintf("Unable to close MockSubscription channel of type %T", mes.channel))
 	}
@@ -782,20 +595,9 @@ func NewHTTPMockServer(
 	}
 }
 
-func NewHTTPMockServerWithAlterableResponse(
-	t *testing.T, response func() string) (server *httptest.Server) {
-	server = httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			io.WriteString(w, response())
-		}))
-	return server
-}
-
 // MockCron represents a mock cron
 type MockCron struct {
 	Entries []MockCronEntry
-	nextID  cron.EntryID
 }
 
 // NewMockCron returns a new mock cron
@@ -807,20 +609,15 @@ func NewMockCron() *MockCron {
 func (*MockCron) Start() {}
 
 // Stop stops the mockcron
-func (*MockCron) Stop() context.Context {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	return ctx
-}
+func (*MockCron) Stop() {}
 
 // AddFunc appends a schedule to mockcron entries
-func (mc *MockCron) AddFunc(schd string, fn func()) (cron.EntryID, error) {
+func (mc *MockCron) AddFunc(schd string, fn func()) error {
 	mc.Entries = append(mc.Entries, MockCronEntry{
 		Schedule: schd,
 		Function: fn,
 	})
-	mc.nextID++
-	return mc.nextID, nil
+	return nil
 }
 
 // RunEntries run every function for each mockcron entry
@@ -866,11 +663,11 @@ func (m *MockHeadTrackable) DisconnectedCount() int32 {
 	return atomic.LoadInt32(&m.disconnectedCount)
 }
 
-// OnNewLongestChain increases the OnNewLongestChainCount count by one
-func (m *MockHeadTrackable) OnNewLongestChain(models.Head) { atomic.AddInt32(&m.onNewHeadCount, 1) }
+// OnNewHead increases the OnNewHeadCount count by one
+func (m *MockHeadTrackable) OnNewHead(*models.Head) { atomic.AddInt32(&m.onNewHeadCount, 1) }
 
-// OnNewLongestChainCount returns the count of new heads, safely.
-func (m *MockHeadTrackable) OnNewLongestChainCount() int32 {
+// OnNewHeadCount returns the count of new heads, safely.
+func (m *MockHeadTrackable) OnNewHeadCount() int32 {
 	return atomic.LoadInt32(&m.onNewHeadCount)
 }
 
@@ -889,19 +686,10 @@ func (ns NeverSleeper) After() time.Duration { return 0 * time.Microsecond }
 // Duration returns a duration
 func (ns NeverSleeper) Duration() time.Duration { return 0 * time.Microsecond }
 
-func MustRandomUser() models.User {
-	email := fmt.Sprintf("user-%v@chainlink.test", NewRandomInt64())
-	r, err := models.NewUser(email, Password)
+func MustUser(email, pwd string) models.User {
+	r, err := models.NewUser(email, pwd)
 	if err != nil {
 		logger.Panic(err)
-	}
-	return r
-}
-
-func MustNewUser(t *testing.T, email, password string) models.User {
-	r, err := models.NewUser(email, password)
-	if err != nil {
-		t.Fatal(err)
 	}
 	return r
 }
@@ -915,25 +703,24 @@ func (m *MockAPIInitializer) Initialize(store *store.Store) (models.User, error)
 		return user, err
 	}
 	m.Count += 1
-	user := MustRandomUser()
+	user := MustUser(APIEmail, Password)
 	return user, store.SaveUser(&user)
 }
 
-func NewMockAuthenticatedHTTPClient(cfg orm.ConfigReader, sessionID string) cmd.HTTPClient {
-	return cmd.NewAuthenticatedHTTPClient(cfg, MockCookieAuthenticator{SessionID: sessionID})
+func NewMockAuthenticatedHTTPClient(cfg orm.ConfigReader) cmd.HTTPClient {
+	return cmd.NewAuthenticatedHTTPClient(cfg, MockCookieAuthenticator{})
 }
 
 type MockCookieAuthenticator struct {
-	SessionID string
-	Error     error
+	Error error
 }
 
 func (m MockCookieAuthenticator) Cookie() (*http.Cookie, error) {
-	return MustGenerateSessionCookie(m.SessionID), m.Error
+	return MustGenerateSessionCookie(APISessionID), m.Error
 }
 
 func (m MockCookieAuthenticator) Authenticate(models.SessionRequest) (*http.Cookie, error) {
-	return MustGenerateSessionCookie(m.SessionID), m.Error
+	return MustGenerateSessionCookie(APISessionID), m.Error
 }
 
 type MockSessionRequestBuilder struct {

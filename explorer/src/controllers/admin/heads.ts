@@ -1,7 +1,8 @@
 import { Router } from 'express'
+import { getDb } from '../../database'
 import { EthereumHeadRepository } from '../../repositories/EthereumHeadRepository'
 import { Head } from '../../entity/Head'
-import { getCustomRepository, getRepository } from 'typeorm'
+import { getCustomRepository } from 'typeorm'
 import { parseParams } from '../../utils/pagination'
 import headsSerializer from '../../serializers/headsSerializer'
 import headSerializer from '../../serializers/headSerializer'
@@ -10,7 +11,11 @@ const router = Router()
 
 router.get('/heads', async (req, res) => {
   const params = parseParams(req.query)
-  const ethereumHeadRepository = getCustomRepository(EthereumHeadRepository)
+  const db = await getDb()
+  const ethereumHeadRepository = getCustomRepository(
+    EthereumHeadRepository,
+    db.name,
+  )
 
   const heads = await ethereumHeadRepository.all(params)
 
@@ -20,9 +25,11 @@ router.get('/heads', async (req, res) => {
 })
 
 router.get('/heads/:headId', async (req, res) => {
-  const ethereumHeadRepository = getRepository(Head)
-  const headId = req.params.headId
-  const head = await ethereumHeadRepository.findOne(headId)
+  const db = await getDb()
+  const ethereumHeadRepository = db.getRepository(Head)
+
+  const { id } = req.params
+  const head = await ethereumHeadRepository.findOne(id)
 
   const json = headSerializer(head)
   return res.send(json)

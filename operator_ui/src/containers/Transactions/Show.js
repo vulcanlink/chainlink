@@ -1,5 +1,5 @@
 import { KeyValueList } from '@chainlink/styleguide'
-import { fetchTransaction } from 'actionCreators'
+import { fetchTransaction } from 'actions'
 import Content from 'components/Content'
 import PropTypes from 'prop-types'
 import React, { useEffect } from 'react'

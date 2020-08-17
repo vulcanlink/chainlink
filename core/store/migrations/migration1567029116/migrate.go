@@ -1,7 +1,7 @@
 package migration1567029116
 
 import (
-	"github.com/smartcontractkit/chainlink/core/store/dbutil"
+	"chainlink/core/store/dbutil"
 
 	"github.com/jinzhu/gorm"
 )

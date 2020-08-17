@@ -1,85 +1,12 @@
-import * as jsonapi from '@chainlink/json-api-client'
-import { Dispatch } from 'redux'
+import * as actions from './actions'
 import _ from 'lodash'
 import moment from 'moment'
 import { ethers } from 'ethers'
-import { FeedConfig, OracleNode, Config } from '../../../config'
-import * as actions from './actions'
 import AggregatorAbi from '../../../contracts/AggregatorAbi.json'
 import AggregatorAbiV2 from '../../../contracts/AggregatorAbi.v2.json'
 import AggregatorContract from '../../../contracts/AggregatorContract'
 import AggregatorContractV2 from '../../../contracts/AggregatorContractV2'
 
-/**
- * feed
- */
-
-export function fetchFeedByPair(pairPath: string) {
-  return async (dispatch: Dispatch) => {
-    dispatch(actions.fetchFeedByPairBegin())
-
-    jsonapi
-      .fetchWithTimeout(Config.feedsJson(), {})
-      .then((r: Response) => r.json())
-      .then((json: FeedConfig[]) => {
-        const feed = json.find(f => f.path === pairPath)
-
-        if (feed) {
-          dispatch(actions.fetchFeedByPairSuccess(feed))
-        } else {
-          dispatch(actions.fetchFeedByPairError('Not Found'))
-        }
-      })
-      .catch(e => {
-        dispatch(actions.fetchFeedByPairError(e.toString()))
-      })
-  }
-}
-
-export function fetchFeedByAddress(contractAddress: string) {
-  return async (dispatch: Dispatch) => {
-    dispatch(actions.fetchFeedByAddressBegin())
-
-    jsonapi
-      .fetchWithTimeout(Config.feedsJson(), {})
-      .then((r: Response) => r.json())
-      .then((json: FeedConfig[]) => {
-        const feed = json.find(f => f.contractAddress === contractAddress)
-
-        if (feed) {
-          dispatch(actions.fetchFeedByAddressSuccess(feed))
-        } else {
-          dispatch(actions.fetchFeedByAddressError('Not Found'))
-        }
-      })
-      .catch(e => {
-        dispatch(actions.fetchFeedByAddressError(e.toString()))
-      })
-  }
-}
-
-/**
- * oracle nodes
- */
-export function fetchOracleNodes() {
-  return async (dispatch: Dispatch) => {
-    dispatch(actions.fetchOracleNodesBegin())
-
-    jsonapi
-      .fetchWithTimeout(Config.nodesJson(), {})
-      .then((r: Response) => r.json())
-      .then((json: OracleNode[]) => {
-        dispatch(actions.fetchOracleNodesSuccess(json))
-      })
-      .catch(e => {
-        dispatch(actions.fetchFeedByPairError(e.toString()))
-      })
-  }
-}
-
-/**
- * oracles
- */
 let contractInstance: any
 
 function fetchOracleList() {
@@ -134,7 +61,7 @@ function fetchLatestAnswerTimestamp() {
 const fetchOracleAnswersById = (request: any) => {
   return async (dispatch: any, getState: any) => {
     try {
-      const currentLogs = getState().aggregator.oracleAnswers
+      const currentLogs = getState().aggregator.oracleAnswers || []
 
       const logs = await contractInstance.oracleAnswerLogs(request)
       const withTimestamp = await contractInstance.addBlockTimestampToLogs(logs)
@@ -144,17 +71,19 @@ const fetchOracleAnswersById = (request: any) => {
 
       const uniquePayload = _.uniqBy(
         [...withGasAndTimeStamp, ...currentLogs],
-        l => l.sender,
+        l => {
+          return l.sender
+        },
       )
 
       dispatch(actions.setOracleAnswers(uniquePayload))
     } catch {
-      console.error('Could not fetch oracle answers')
+      console.error('Could not fetch oracle ansers')
     }
   }
 }
 
-const fetchLatestRequestTimestamp = (config: FeedConfig) => {
+const fetchLatestRequestTimestamp = (config: any) => {
   return async (dispatch: any) => {
     try {
       // calculate last update time
@@ -188,12 +117,12 @@ function fetchMinimumAnswers() {
   }
 }
 
-function fetchAnswerHistory(config: FeedConfig) {
+function fetchAnswerHistory() {
   return async (dispatch: any) => {
     try {
       const fromBlock = await contractInstance.provider
         .getBlockNumber()
-        .then((b: any) => b - 6700 * (config.historyDays ?? 1)) // 6700 block is ~24 hours
+        .then((b: any) => b - 6700) // 6700 block is ~24 hours
 
       const payload = await contractInstance.answerUpdatedLogs({ fromBlock })
       const uniquePayload = _.uniqBy(payload, (e: any) => {
@@ -259,9 +188,9 @@ function initListeners() {
           return l.meta.transactionHash !== responseLog.meta.transactionHash
         })
 
-        const updateLogs = uniqueLogs.map((l: any) =>
-          l.sender === responseLog.sender ? responseLog : l,
-        )
+        const updateLogs = uniqueLogs.map((l: any) => {
+          return l.sender === responseLog.sender ? responseLog : l
+        })
 
         const senderIndex = _.findIndex(uniqueLogs, {
           sender: responseLog.sender,
@@ -287,10 +216,14 @@ function initListeners() {
   }
 }
 
-const initContract = (config: FeedConfig) => {
+const initContract = (config: any) => {
   return async (dispatch: any, getState: any) => {
+    dispatch(actions.clearState())
+
     try {
-      contractInstance?.kill()
+      if (contractInstance) {
+        contractInstance.kill()
+      }
     } catch {
       console.error('Could not close the contract instance')
     }
@@ -301,6 +234,7 @@ const initContract = (config: FeedConfig) => {
       throw new Error('Wrong contract address')
     }
 
+    dispatch(actions.setConfig(config))
     dispatch(actions.setContractAddress(config.contractAddress))
 
     if (config.contractVersion === 2) {
@@ -310,20 +244,25 @@ const initContract = (config: FeedConfig) => {
     }
 
     // Oracle addresses
+
     await fetchOracleList()(dispatch, getState)
 
     // Minimum oracle responses
+
     fetchMinimumAnswers()(dispatch)
 
     // Set answer Id
+
     const nextAnswerId = await contractInstance.nextAnswerId()
     dispatch(actions.setNextAnswerId(nextAnswerId))
     dispatch(actions.setPendingAnswerId(nextAnswerId - 1))
 
     // Current answers
+
     await fetchLatestAnswerTimestamp()(dispatch)
 
     // Fetch previous answers
+
     const currentBlockNumber = await contractInstance.provider.getBlockNumber()
 
     await fetchOracleAnswersById({
@@ -332,6 +271,7 @@ const initContract = (config: FeedConfig) => {
     })(dispatch, getState)
 
     // Fetch latest answers
+
     fetchOracleAnswersById({
       answerId: nextAnswerId - 1,
       fromBlock: currentBlockNumber - 6700,
@@ -341,22 +281,38 @@ const initContract = (config: FeedConfig) => {
      * Oracle Latest Request Time
      * Used to calculate hearbeat countdown timer
      */
+
     if (config.heartbeat) {
       fetchLatestRequestTimestamp(config)(dispatch)
     }
 
     // Latest completed answer id
+
     fetchLatestCompletedAnswerId()(dispatch)
 
     // Current answer and block height
+
     fetchLatestAnswer()(dispatch)
 
-    // initialise listeners
+    // initalise listeners
+
     initListeners()(dispatch, getState)
 
     if (config.history) {
-      fetchAnswerHistory(config)(dispatch)
+      fetchAnswerHistory()(dispatch)
     }
+  }
+}
+
+function clearState() {
+  return async (dispatch: any) => {
+    try {
+      contractInstance.kill()
+    } catch {
+      console.error('Could not clear the contract')
+    }
+
+    dispatch(actions.clearState())
   }
 }
 
@@ -384,15 +340,4 @@ function fetchEthGasPrice() {
   }
 }
 
-function clearContract() {
-  return async (dispatch: any) => {
-    try {
-      dispatch(actions.clearState())
-      contractInstance?.kill()
-    } catch {
-      console.error('Could not close the contract instance')
-    }
-  }
-}
-
-export { initContract, fetchJobId, fetchEthGasPrice, clearContract }
+export { initContract, clearState, fetchJobId, fetchEthGasPrice }

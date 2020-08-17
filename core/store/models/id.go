@@ -5,18 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"chainlink/core/utils"
 
 	uuid "github.com/satori/go.uuid"
 )
 
 // ID is a UUID that has a custom display format
 type ID uuid.UUID
-
-// UUID converts it back into a uuid.UUID
-func (id ID) UUID() uuid.UUID {
-	return uuid.UUID(id)
-}
 
 // NewID returns a new ID
 func NewID() *ID {
@@ -69,6 +64,6 @@ func (id *ID) Scan(value interface{}) error {
 	case string:
 		return id.UnmarshalString(v)
 	default:
-		return fmt.Errorf("unable to convert %v of %T to ID", value, value)
+		return fmt.Errorf("Unable to convert %v of %T to ID", value, value)
 	}
 }

@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/core/adapters"
-	"github.com/smartcontractkit/chainlink/core/assets"
-	"github.com/smartcontractkit/chainlink/core/internal/cltest"
-	"github.com/smartcontractkit/chainlink/core/internal/mocks"
-	"github.com/smartcontractkit/chainlink/core/null"
-	"github.com/smartcontractkit/chainlink/core/services"
-	"github.com/smartcontractkit/chainlink/core/store/models"
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"chainlink/core/adapters"
+	"chainlink/core/assets"
+	"chainlink/core/internal/cltest"
+	"chainlink/core/internal/mocks"
+	"chainlink/core/null"
+	"chainlink/core/services"
+	"chainlink/core/store/models"
+	"chainlink/core/utils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -57,7 +57,7 @@ func TestRunExecutor_Execute(t *testing.T) {
 	assert.Equal(t, assets.NewLink(9117), actual)
 }
 
-func TestRunExecutor_Execute_PendingOutgoing(t *testing.T) {
+func TestRunExecutor_Execute_Pending(t *testing.T) {
 	t.Parallel()
 
 	store, cleanup := cltest.NewStore(t)
@@ -73,7 +73,7 @@ func TestRunExecutor_Execute_PendingOutgoing(t *testing.T) {
 	j.Initiators = []models.Initiator{i}
 	j.Tasks = []models.TaskSpec{
 		cltest.NewTask(t, "noop"),
-		cltest.NewTask(t, "nooppendoutgoing"),
+		cltest.NewTask(t, "nooppend"),
 	}
 	assert.NoError(t, store.CreateJob(&j))
 
@@ -85,10 +85,10 @@ func TestRunExecutor_Execute_PendingOutgoing(t *testing.T) {
 
 	run, err = store.FindJobRun(run.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.RunStatusPendingOutgoingConfirmations, run.GetStatus())
+	assert.Equal(t, models.RunStatusPendingConfirmations, run.GetStatus())
 	require.Len(t, run.TaskRuns, 2)
 	assert.Equal(t, models.RunStatusCompleted, run.TaskRuns[0].Status)
-	assert.Equal(t, models.RunStatusPendingOutgoingConfirmations, run.TaskRuns[1].Status)
+	assert.Equal(t, models.RunStatusPendingConfirmations, run.TaskRuns[1].Status)
 
 	actual, err := store.LinkEarnedFor(&j)
 	require.NoError(t, err)
@@ -115,8 +115,6 @@ func TestRunExecutor_Execute_CancelActivelyRunningTask(t *testing.T) {
 
 	store, cleanup := cltest.NewStore(t)
 	defer cleanup()
-	// It will never be triggered, so sleep tasks will run forever (or until
-	// cancelled)
 	clock := cltest.NewTriggerClock(t)
 	store.Clock = clock
 
@@ -147,11 +145,12 @@ func TestRunExecutor_Execute_CancelActivelyRunningTask(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	runQueue := new(mocks.RunQueue)
-	runManager := services.NewRunManager(runQueue, store.Config, store.ORM, pusher, store.TxManager, store.Clock)
-	_, err := runManager.Cancel(run.ID)
-	require.NoError(t, err)
+	runManager := services.NewRunManager(runQueue, store.Config, store.ORM, pusher, store.TxManager, clock)
+	runManager.Cancel(run.ID)
 
-	run, err = store.FindJobRun(run.ID)
+	clock.Trigger()
+
+	run, err := store.FindJobRun(run.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.RunStatusCancelled, run.GetStatus())
 
@@ -182,7 +181,7 @@ func TestRunExecutor_InitialTaskLacksConfirmations(t *testing.T) {
 	run := cltest.NewJobRun(j)
 	txHash := cltest.NewHash()
 	run.RunRequest.TxHash = &txHash
-	run.TaskRuns[0].MinRequiredIncomingConfirmations = null.Uint32From(10)
+	run.TaskRuns[0].MinimumConfirmations = null.Uint32From(10)
 	run.CreationHeight = utils.NewBig(big.NewInt(0))
 	run.ObservedHeight = run.CreationHeight
 	require.NoError(t, store.CreateJobRun(&run))
@@ -190,9 +189,9 @@ func TestRunExecutor_InitialTaskLacksConfirmations(t *testing.T) {
 
 	run, err := store.FindJobRun(run.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.RunStatusPendingIncomingConfirmations, run.GetStatus())
+	assert.Equal(t, models.RunStatusPendingConfirmations, run.GetStatus())
 	require.Len(t, run.TaskRuns, 1)
-	assert.Equal(t, models.RunStatusPendingIncomingConfirmations, run.TaskRuns[0].Status)
+	assert.Equal(t, models.RunStatusPendingConfirmations, run.TaskRuns[0].Status)
 }
 
 func TestJobRunner_prioritizeSpecParamsOverRequestParams(t *testing.T) {

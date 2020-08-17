@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -31,7 +32,7 @@ func TestEIP55Address(t *testing.T) {
 		0xb0, 0x14, 0x68, 0x7e,
 	}), address.Hash())
 
-	assert.Equal(t, "0xa0788FC17B1dEe36f057c42B6F373A34B014687e", address.String())
+	assert.Equal(t, "0xa0788FC17B1dEe36f057c42B6F373A34B014687e", fmt.Sprintf("%s", address))
 
 	zeroAddress := EIP55Address("")
 	err := json.Unmarshal([]byte(`"0xa0788FC17B1dEe36f057c42B6F373A34B014687e"`), &zeroAddress)

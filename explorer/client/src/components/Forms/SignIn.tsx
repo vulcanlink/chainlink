@@ -32,7 +32,6 @@ const styles = ({ palette, spacing }: Theme) =>
     error: {
       backgroundColor: palette.error.light,
       marginTop: spacing.unit * 2,
-      padding: spacing.unit * 2,
     },
     errorText: {
       color: palette.error.main,
@@ -95,12 +94,14 @@ export const SignIn = withStyles(styles)(
                     return (
                       <Grid item xs={12} key={idx}>
                         <Card raised={false} className={classes.error}>
-                          <Typography
-                            variant="body1"
-                            className={classes.errorText}
-                          >
-                            {text}
-                          </Typography>
+                          <CardContent>
+                            <Typography
+                              variant="body1"
+                              className={classes.errorText}
+                            >
+                              {text}
+                            </Typography>
+                          </CardContent>
                         </Card>
                       </Grid>
                     )

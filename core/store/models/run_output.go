@@ -37,11 +37,11 @@ func NewRunOutputComplete(data JSON) RunOutput {
 	return RunOutput{status: RunStatusCompleted, data: data}
 }
 
-// NewRunOutputPendingOutgoingConfirmationsWithData returns a new RunOutput that
-// indicates the task is pending outgoing confirmations but also has some data that
+// NewRunOutputPendingConfirmationsWithData returns a new RunOutput that
+// indicates the task is pending confirmations but also has some data that
 // needs to be fed in on next invocation
-func NewRunOutputPendingOutgoingConfirmationsWithData(data JSON) RunOutput {
-	return RunOutput{status: RunStatusPendingOutgoingConfirmations, data: data}
+func NewRunOutputPendingConfirmationsWithData(data JSON) RunOutput {
+	return RunOutput{status: RunStatusPendingConfirmations, data: data}
 }
 
 // NewRunOutputPendingConnection returns a new RunOutput that indicates the

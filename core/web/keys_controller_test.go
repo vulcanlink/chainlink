@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink/core/internal/cltest"
-	"github.com/smartcontractkit/chainlink/core/store/models"
+	"chainlink/core/internal/cltest"
+	"chainlink/core/store/models"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -15,15 +15,13 @@ func TestKeysController_CreateSuccess(t *testing.T) {
 	t.Parallel()
 
 	config, _ := cltest.NewConfig(t)
-	app, cleanup := cltest.NewApplicationWithConfigAndKey(t, config,
-		cltest.EthMockRegisterChainID,
-		cltest.EthMockRegisterGetBalance,
-	)
+	app, cleanup := cltest.NewApplicationWithConfigAndKey(t, config)
 	defer cleanup()
 
 	ethMock := app.EthMock
 	ethMock.Context("app.Start()", func(ethMock *cltest.EthMock) {
 		ethMock.Register("eth_getTransactionCount", "0x100")
+		ethMock.Register("eth_chainId", config.ChainID())
 	})
 
 	client := app.NewHTTPClient()
@@ -49,15 +47,13 @@ func TestKeysController_InvalidPassword(t *testing.T) {
 	t.Parallel()
 
 	config, _ := cltest.NewConfig(t)
-	app, cleanup := cltest.NewApplicationWithConfigAndKey(t, config,
-		cltest.EthMockRegisterChainID,
-		cltest.EthMockRegisterGetBalance,
-	)
+	app, cleanup := cltest.NewApplicationWithConfigAndKey(t, config)
 	defer cleanup()
 
 	ethMock := app.EthMock
 	ethMock.Context("app.Start()", func(ethMock *cltest.EthMock) {
 		ethMock.Register("eth_getTransactionCount", "0x100")
+		ethMock.Register("eth_chainId", config.ChainID())
 	})
 
 	client := app.NewHTTPClient()
@@ -83,15 +79,13 @@ func TestKeysController_JSONBindingError(t *testing.T) {
 	t.Parallel()
 
 	config, _ := cltest.NewConfig(t)
-	app, cleanup := cltest.NewApplicationWithConfigAndKey(t, config,
-		cltest.EthMockRegisterChainID,
-		cltest.EthMockRegisterGetBalance,
-	)
+	app, cleanup := cltest.NewApplicationWithConfigAndKey(t, config)
 	defer cleanup()
 
 	ethMock := app.EthMock
 	ethMock.Context("app.Start()", func(ethMock *cltest.EthMock) {
 		ethMock.Register("eth_getTransactionCount", "0x100")
+		ethMock.Register("eth_chainId", app.Store.Config.ChainID())
 	})
 
 	client := app.NewHTTPClient()

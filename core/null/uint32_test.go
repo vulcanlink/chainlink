@@ -1,4 +1,4 @@
-package null_test
+package null
 
 import (
 	"encoding/json"
@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink/core/null"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +21,7 @@ func TestUint32From(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d", test.input), func(t *testing.T) {
-			i := null.Uint32From(test.input)
+			i := Uint32From(test.input)
 			assert.True(t, i.Valid)
 			assert.Equal(t, test.input, i.Uint32)
 		})
@@ -39,7 +38,7 @@ func TestUnmarshalUint32_Valid(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var i null.Uint32
+			var i Uint32
 			err := json.Unmarshal([]byte(test.input), &i)
 			require.NoError(t, err)
 			assert.True(t, i.Valid)
@@ -58,7 +57,7 @@ func TestUnmarshalUint32_Invalid(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var i null.Uint32
+			var i Uint32
 			err := json.Unmarshal([]byte(test.input), &i)
 			require.NoError(t, err)
 			assert.False(t, i.Valid)
@@ -77,7 +76,7 @@ func TestUnmarshalUint32_Error(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var i null.Uint32
+			var i Uint32
 			err := json.Unmarshal([]byte(test.input), &i)
 			require.Error(t, err)
 			assert.False(t, i.Valid)
@@ -89,7 +88,7 @@ func TestUnmarshalUint32Overflow(t *testing.T) {
 	maxUint32 := uint64(math.MaxUint32)
 
 	// Max uint32 should decode successfully
-	var i null.Uint32
+	var i Uint32
 	err := json.Unmarshal([]byte(strconv.FormatUint(maxUint32, 10)), &i)
 	require.NoError(t, err)
 
@@ -99,7 +98,7 @@ func TestUnmarshalUint32Overflow(t *testing.T) {
 }
 
 func TestTextUnmarshalInt_Valid(t *testing.T) {
-	var i null.Uint32
+	var i Uint32
 	err := i.UnmarshalText([]byte("12345"))
 	require.NoError(t, err)
 	assert.True(t, i.Valid)
@@ -116,7 +115,7 @@ func TestTextUnmarshalInt_Invalid(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var i null.Uint32
+			var i Uint32
 			err := i.UnmarshalText([]byte(test.input))
 			require.NoError(t, err)
 			assert.False(t, i.Valid)
@@ -125,40 +124,40 @@ func TestTextUnmarshalInt_Invalid(t *testing.T) {
 }
 
 func TestMarshalInt(t *testing.T) {
-	i := null.Uint32From(12345)
+	i := Uint32From(12345)
 	data, err := json.Marshal(i)
 	require.NoError(t, err)
 	assertJSONEquals(t, data, "12345", "non-empty json marshal")
 
 	// invalid values should be encoded as null
-	null := null.NewUint32(0, false)
+	null := NewUint32(0, false)
 	data, err = json.Marshal(null)
 	require.NoError(t, err)
 	assertJSONEquals(t, data, "null", "null json marshal")
 }
 
 func TestMarshalIntText(t *testing.T) {
-	i := null.Uint32From(12345)
+	i := Uint32From(12345)
 	data, err := i.MarshalText()
 	require.NoError(t, err)
 	assertJSONEquals(t, data, "12345", "non-empty text marshal")
 
 	// invalid values should be encoded as null
-	null := null.NewUint32(0, false)
+	null := NewUint32(0, false)
 	data, err = null.MarshalText()
 	require.NoError(t, err)
 	assertJSONEquals(t, data, "", "null text marshal")
 }
 
 func TestUint32SetValid(t *testing.T) {
-	change := null.NewUint32(0, false)
+	change := NewUint32(0, false)
 	change.SetValid(12345)
 	assert.True(t, change.Valid)
 	assert.Equal(t, uint32(12345), change.Uint32)
 }
 
 func TestUint32Scan(t *testing.T) {
-	var i null.Uint32
+	var i Uint32
 	err := i.Scan(12345)
 	require.NoError(t, err)
 	assert.True(t, i.Valid)

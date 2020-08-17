@@ -3,15 +3,15 @@ import express from 'express'
 import helmet from 'helmet'
 import http from 'http'
 import mime from 'mime-types'
-import { Environment, Config } from './config'
+import { Environment, ExplorerConfig } from './config'
 import * as controllers from './controllers'
 import { addRequestLogging, logger } from './logging'
 import adminAuth from './middleware/adminAuth'
 import seed from './seed'
 import { bootstrapRealtime } from './server/realtime'
 
-export default function server(): Promise<http.Server> {
-  if (Config.env() === Environment.DEV) {
+export default function server(conf: ExplorerConfig): Promise<http.Server> {
+  if (conf.env === Environment.DEV) {
     seed()
   }
 
@@ -19,13 +19,13 @@ export default function server(): Promise<http.Server> {
   addRequestLogging(app)
 
   app.use(helmet())
-  if (Config.env() === Environment.DEV) {
+  if (conf.env === Environment.DEV) {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const cors: typeof import('cors') = require('cors')
 
     app.use(
       cors({
-        origin: [Config.clientOrigin()],
+        origin: [conf.clientOrigin],
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
         preflightContinue: false,
         optionsSuccessStatus: 204,
@@ -37,8 +37,8 @@ export default function server(): Promise<http.Server> {
   app.use(
     cookieSession({
       name: 'explorer',
-      maxAge: Config.cookieExpirationMs(),
-      secret: Config.cookieSecret(),
+      maxAge: conf.cookieExpirationMs,
+      secret: conf.cookieSecret,
     }),
   )
   app.use(express.json())
@@ -72,8 +72,8 @@ export default function server(): Promise<http.Server> {
   bootstrapRealtime(httpServer)
 
   return new Promise(resolve => {
-    const server = httpServer.listen(Config.port(), async () => {
-      logger.info(`Server started, listening on port ${Config.port()}`)
+    const server = httpServer.listen(conf.port, async () => {
+      logger.info(`Server started, listening on port ${conf.port}`)
       resolve(server)
     })
   })

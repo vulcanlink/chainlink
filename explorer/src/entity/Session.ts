@@ -1,8 +1,8 @@
 import {
   Column,
+  Connection,
+  CreateDateColumn,
   Entity,
-  getRepository,
-  getManager,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
   UpdateResult,
@@ -20,6 +20,7 @@ export class Session {
   @PrimaryGeneratedColumn('uuid')
   public id: string
 
+  @CreateDateColumn()
   // @ts-ignore
   private createdAt: Date
 
@@ -29,31 +30,37 @@ export class Session {
 }
 
 export async function createSession(
+  db: Connection,
   node: ChainlinkNode,
-  manager = getManager(),
 ): Promise<Session> {
-  // Close any other open sessions for this node
-  await manager
-    .getRepository(Session)
-    .update(
-      { chainlinkNodeId: node.id, finishedAt: null },
-      { finishedAt: () => 'now()' },
-    )
-
+  await db.manager
+    .createQueryBuilder()
+    .update(Session)
+    .set({ finishedAt: () => 'now()' })
+    .where({ chainlinkNodeId: node.id, finishedAt: null })
+    .execute()
   const session = new Session()
   session.chainlinkNodeId = node.id
-  return manager.save(session)
+  return db.manager.save(session)
 }
 
-export async function retireSessions(): Promise<UpdateResult> {
-  return getRepository(Session).update(
-    { finishedAt: null },
-    { finishedAt: () => 'now()' },
-  )
+export async function retireSessions(db: Connection): Promise<UpdateResult> {
+  return db.manager
+    .createQueryBuilder()
+    .update(Session)
+    .set({ finishedAt: new Date() })
+    .where({ finishedAt: null })
+    .execute()
 }
 
-export async function closeSession(session: Session): Promise<UpdateResult> {
-  return getRepository(Session).update(session.id, {
-    finishedAt: () => 'now()',
-  })
+export async function closeSession(
+  db: Connection,
+  session: Session,
+): Promise<UpdateResult> {
+  return db.manager
+    .createQueryBuilder()
+    .update(Session)
+    .set({ finishedAt: () => 'now()' })
+    .where({ sessionId: session.id })
+    .execute()
 }

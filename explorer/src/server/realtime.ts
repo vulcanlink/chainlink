@@ -1,25 +1,18 @@
 import http from 'http'
-import WebSocket from 'ws'
-import { closeSession, Session } from '../entity/Session'
 import { logger } from '../logging'
+import WebSocket from 'ws'
+import { getDb } from '../database'
 import { authenticate } from '../sessions'
+import { closeSession, Session } from '../entity/Session'
+import { handleMessage } from './handleMessage'
 import {
   ACCESS_KEY_HEADER,
-  CORE_SHA_HEADER,
-  CORE_VERSION_HEADER,
   NORMAL_CLOSE,
   SECRET_HEADER,
 } from '../utils/constants'
-import { handleMessage } from './handleMessage'
-
-export type AuthInfo = {
-  accessKey?: string
-  secret?: string
-  coreVersion?: string
-  coreSHA?: string
-}
 
 export const bootstrapRealtime = async (server: http.Server) => {
+  const db = await getDb()
   let clnodeCount = 0
   const sessions = new Map<string, Session>()
   const connections = new Map<string, WebSocket>()
@@ -41,11 +34,11 @@ export const bootstrapRealtime = async (server: http.Server) => {
       const remote = remoteDetails(info.req)
       logger.debug({ msg: 'websocket connection attempt', remote })
 
-      const authInfo = extractAuthInfo(info.req.headers)
-      const { accessKey, secret } = authInfo
+      const accessKey = info.req.headers[ACCESS_KEY_HEADER]
+      const secret = info.req.headers[SECRET_HEADER]
 
       if (typeof accessKey !== 'string' || typeof secret !== 'string') {
-        logger.warn({
+        logger.info({
           msg: 'client rejected, invalid authentication request',
           origin: info.origin,
           ...remote,
@@ -53,9 +46,9 @@ export const bootstrapRealtime = async (server: http.Server) => {
         return
       }
 
-      authenticate(authInfo).then((session: Session | null) => {
+      authenticate(db, accessKey, secret).then((session: Session | null) => {
         if (session === null) {
-          logger.warn({
+          logger.info({
             msg: 'client rejected, failed authentication',
             accessKey,
             origin: info.origin,
@@ -65,23 +58,16 @@ export const bootstrapRealtime = async (server: http.Server) => {
           return
         }
 
-        logger.info({
+        logger.debug({
           msg: `websocket client successfully authenticated`,
           nodeID: session.chainlinkNodeId,
           origin: info.origin,
           ...remote,
         })
-
         sessions.set(accessKey, session)
         const existingConnection = connections.get(accessKey)
         if (existingConnection) {
           existingConnection.close(NORMAL_CLOSE, 'Duplicate connection opened')
-          logger.warn({
-            msg: 'Duplicated connection opened',
-            nodeID: session.chainlinkNodeId,
-            origin: info.origin,
-            ...remote,
-          })
         }
         callback(true, 200)
       })
@@ -121,7 +107,7 @@ export const bootstrapRealtime = async (server: http.Server) => {
       const existingConnection = connections.get(accessKey)
 
       if (session != null) {
-        closeSession(session)
+        closeSession(db, session)
         sessions.delete(accessKey)
       }
       if (ws === existingConnection) {
@@ -144,19 +130,4 @@ function remoteDetails(
     remotePort: req.socket.remotePort,
     remoteAddress: req.socket.remoteAddress,
   }
-}
-
-function extractAuthInfo(headers: http.IncomingHttpHeaders): AuthInfo {
-  return {
-    accessKey: stringOrUndefined(headers[ACCESS_KEY_HEADER]),
-    secret: stringOrUndefined(headers[SECRET_HEADER]),
-    coreVersion: stringOrUndefined(headers[CORE_VERSION_HEADER]),
-    coreSHA: stringOrUndefined(headers[CORE_SHA_HEADER]),
-  }
-}
-
-function stringOrUndefined(
-  key: string | string[] | undefined,
-): string | undefined {
-  return typeof key === 'string' ? key : undefined
 }

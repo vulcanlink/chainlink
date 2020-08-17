@@ -13,9 +13,9 @@ export default class AggregatorContract {
     filter: {},
     listener: {},
   }
-  answerIdInterval = null
-  provider = null
-  contract = null
+  answerIdInterval
+  provider
+  contract
 
   constructor(config, abi) {
     this.provider = createInfuraProvider(config.networkId)
@@ -78,7 +78,6 @@ export default class AggregatorContract {
       latestAnswer,
       this.config.multiply,
       this.config.decimalPlaces,
-      this.config.formatDecimalPlaces,
     )
   }
 
@@ -92,25 +91,27 @@ export default class AggregatorContract {
     if (!this.alive) return
     const answerCounter = await this.provider.getStorageAt(this.address, 13)
     const bigNumberify = ethers.utils.bigNumberify(answerCounter)
-    return bigNumberify.toNumber()
+    return Number(bigNumberify)
   }
 
   async latestCompletedAnswer() {
     const completedAnswer = await this.contract.latestCompletedAnswer()
-    return completedAnswer.toNumber()
+    return Number(completedAnswer)
   }
 
   async minimumAnswers() {
     const minimumAnswers = await this.contract.minimumResponses()
-    return minimumAnswers.toNumber()
+    return Number(minimumAnswers)
   }
 
   async addBlockTimestampToLogs(logs) {
     if (_.isEmpty(logs)) return logs
 
-    const blockTimePromises = logs.map(log =>
-      this.provider.getBlock(log.meta.blockNumber),
-    )
+    const blockTimePromises = []
+
+    for (let i = 0; i < logs.length; i++) {
+      blockTimePromises.push(this.provider.getBlock(logs[i].meta.blockNumber))
+    }
     const blockTimes = await Promise.all(blockTimePromises)
 
     return logs.map((l, i) => {
@@ -152,7 +153,6 @@ export default class AggregatorContract {
           decodedLog.response,
           this.config.multiply,
           this.config.decimalPlaces,
-          this.config.formatDecimalPlaces,
         ),
         answer: Number(decodedLog.response),
         answerId: Number(decodedLog.answerId),
@@ -220,7 +220,6 @@ export default class AggregatorContract {
               decodedLog.response,
               this.config.multiply,
               this.config.decimalPlaces,
-              this.config.formatDecimalPlaces,
             ),
             answer: Number(decodedLog.response),
             answerId: Number(decodedLog.answerId),
@@ -255,7 +254,6 @@ export default class AggregatorContract {
           decodedLog.current,
           this.config.multiply,
           this.config.decimalPlaces,
-          this.config.formatDecimalPlaces,
         ),
         answer: Number(decodedLog.current),
         answerId: Number(decodedLog.answerId),

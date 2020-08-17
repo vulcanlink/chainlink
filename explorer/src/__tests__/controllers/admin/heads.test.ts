@@ -1,7 +1,8 @@
 import http from 'http'
 import httpStatus from 'http-status-codes'
-import { getRepository } from 'typeorm'
+import { Connection } from 'typeorm'
 import { BigNumber } from 'bignumber.js'
+import { getDb } from '../../../database'
 import { clearDb } from '../../testdatabase'
 import { createAdmin } from '../../../support/admin'
 import { Head } from '../../../entity/Head'
@@ -14,16 +15,18 @@ const ADMIN_PATH = '/api/v1/admin'
 const adminHeadsPath = `${ADMIN_PATH}/heads`
 
 let server: http.Server
+let db: Connection
 let rb: RequestBuilder
 
 beforeAll(async () => {
+  db = await getDb()
   server = await start()
   rb = requestBuilder(server)
 })
 afterAll(done => stop(server, done))
 beforeEach(async () => {
   await clearDb()
-  await createAdmin(USERNAME, PASSWORD)
+  await createAdmin(db, USERNAME, PASSWORD)
 })
 
 describe('GET /api/v1/admin/heads', () => {
@@ -112,5 +115,5 @@ const DEFAULT_HEAD_ATTRS: Pick<
 
 function createHead(attrs: Partial<Head> = {}): Promise<Head> {
   const head = Head.build({ ...DEFAULT_HEAD_ATTRS, ...attrs })
-  return getRepository(Head).save(head)
+  return db.manager.save(head)
 }

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import PropTypes from 'prop-types'
-import { receiveSignoutSuccess } from 'actionCreators'
+import { receiveSignoutSuccess } from 'actions'
 import { connect } from 'react-redux'
 
 export const SignOut = ({ receiveSignoutSuccess }) => {

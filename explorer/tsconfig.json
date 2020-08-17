@@ -8,13 +8,9 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.json",
-    "ormconfig/*.json",
+    "ormconfig.json",
     "client/package.json",
     "package.json"
   ],
-  "references": [
-    {
-      "path": "../tools/ts-helpers"
-    }
-  ]
+  "references": [{ "path": "../tools/ts-helpers" }]
 }

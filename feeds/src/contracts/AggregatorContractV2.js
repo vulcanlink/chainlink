@@ -9,13 +9,12 @@ export default class AggregatorContractV2 extends AggregatorContract {
       latestAnswer,
       this.config.multiply,
       this.config.decimalPlaces,
-      this.config.formatDecimalPlaces,
     )
   }
 
   async latestAnswerTimestamp() {
     const latestTimestamp = await this.contract.latestTimestamp()
-    return latestTimestamp.toNumber()
+    return Number(latestTimestamp)
   }
 
   async latestCompletedAnswer() {
@@ -41,7 +40,6 @@ export default class AggregatorContractV2 extends AggregatorContract {
           decodedLog.current,
           this.config.multiply,
           this.config.decimalPlaces,
-          this.config.formatDecimalPlaces,
         ),
         answer: Number(decodedLog.current),
         answerId: Number(decodedLog.roundId),

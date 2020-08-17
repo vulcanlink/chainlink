@@ -2,13 +2,14 @@ package store
 
 import (
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/pkg/errors"
 	"go.uber.org/multierr"
 
-	"github.com/smartcontractkit/chainlink/core/services/vrf"
-	"github.com/smartcontractkit/chainlink/core/store/models/vrfkey"
+	"chainlink/core/services/vrf"
+	"chainlink/core/store/models/vrfkey"
 )
 
 // VRFKeyStore tracks auxiliary VRF secret keys, and generates their VRF proofs
@@ -34,21 +35,20 @@ func NewVRFKeyStore(store *Store) *VRFKeyStore {
 	}
 }
 
-// GenerateProof is marshaled randomness proof given k and VRF input seed
-// computed from the SeedData
+// GenerateProof(k, seed) is marshaled randomness proof given public key k and
+// VRF input seed.
 //
-// Key must have already been unlocked in ks, as constructing the VRF proof
+// k must have already been unlocked in ks, as constructing the VRF proof
 // requires the secret key.
-func (ks *VRFKeyStore) GenerateProof(k vrfkey.PublicKey, i vrf.PreSeedData) (
-	vrf.MarshaledOnChainResponse, error) {
+func (ks *VRFKeyStore) GenerateProof(k *vrfkey.PublicKey, seed *big.Int) (
+	vrf.MarshaledProof, error) {
 	ks.lock.RLock()
 	defer ks.lock.RUnlock()
-	privateKey, found := ks.keys[k]
+	privateKey, found := ks.keys[*k]
 	if !found {
-		return vrf.MarshaledOnChainResponse{}, fmt.Errorf(
-			"key %s has not been unlocked", k)
+		return vrf.MarshaledProof{}, fmt.Errorf("key %s has not been unlocked", k)
 	}
-	return privateKey.MarshaledProof(i)
+	return privateKey.MarshaledProof(seed)
 }
 
 // Unlock tries to unlock each vrf key in the db, using the given pass phrase,
@@ -57,7 +57,7 @@ func (ks *VRFKeyStore) Unlock(phrase string) (keysUnlocked []vrfkey.PublicKey,
 	merr error) {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
-	keys, err := ks.get()
+	keys, err := ks.get(nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "while retrieving vrf keys from db")
 	}
@@ -75,16 +75,16 @@ func (ks *VRFKeyStore) Unlock(phrase string) (keysUnlocked []vrfkey.PublicKey,
 
 // Forget removes the in-memory copy of the secret key of k, or errors if not
 // present. Caller is responsible for taking ks.lock.
-func (ks *VRFKeyStore) forget(k vrfkey.PublicKey) error {
-	if _, found := ks.keys[k]; !found {
+func (ks *VRFKeyStore) forget(k *vrfkey.PublicKey) error {
+	if _, found := ks.keys[*k]; !found {
 		return fmt.Errorf("public key %s is not unlocked; can't forget it", k)
+	} else {
+		delete(ks.keys, *k)
+		return nil
 	}
-
-	delete(ks.keys, k)
-	return nil
 }
 
-func (ks *VRFKeyStore) Forget(k vrfkey.PublicKey) error {
+func (ks *VRFKeyStore) Forget(k *vrfkey.PublicKey) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 	return ks.forget(k)

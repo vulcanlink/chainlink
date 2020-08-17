@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link as ReactStaticLink } from 'react-router-dom'
 
 interface Props {
   children: React.ReactNode
@@ -9,9 +9,9 @@ interface Props {
 }
 
 const BaseLink = ({ children, href, id, className }: Props) => (
-  <Link to={href} id={id} className={className}>
+  <ReactStaticLink to={href} id={id} className={className}>
     {children}
-  </Link>
+  </ReactStaticLink>
 )
 
 export default BaseLink

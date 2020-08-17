@@ -1,31 +1,29 @@
 package services
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/core/types"
-
-	"github.com/smartcontractkit/chainlink/core/logger"
-	clnull "github.com/smartcontractkit/chainlink/core/null"
-	"github.com/smartcontractkit/chainlink/core/services/eth"
-	"github.com/smartcontractkit/chainlink/core/store/models"
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"chainlink/core/eth"
+	"chainlink/core/logger"
+	clnull "chainlink/core/null"
+	"chainlink/core/store"
+	"chainlink/core/store/models"
+	"chainlink/core/utils"
 )
 
-func markInProgressIfSufficientIncomingConfirmations(run *models.JobRun, taskRun *models.TaskRun, currentHeight *utils.Big, ethClient eth.Client) {
-	updateTaskRunObservedIncomingConfirmations(currentHeight, run, taskRun)
+func validateMinimumConfirmations(run *models.JobRun, taskRun *models.TaskRun, currentHeight *utils.Big, txManager store.TxManager) {
+	updateTaskRunConfirmations(currentHeight, run, taskRun)
 
-	if !meetsMinRequiredIncomingConfirmations(run, taskRun, run.ObservedHeight) {
+	if !meetsMinimumConfirmations(run, taskRun, run.ObservedHeight) {
 		logger.Debugw("Pausing run pending confirmations",
-			run.ForLogger("required_height", taskRun.MinRequiredIncomingConfirmations)...,
+			run.ForLogger("required_height", taskRun.MinimumConfirmations)...,
 		)
 
-		taskRun.Status = models.RunStatusPendingIncomingConfirmations
-		run.SetStatus(models.RunStatusPendingIncomingConfirmations)
+		taskRun.Status = models.RunStatusPendingConfirmations
+		run.SetStatus(models.RunStatusPendingConfirmations)
 
-	} else if err := validateOnMainChain(run, taskRun, ethClient); err != nil {
+	} else if err := validateOnMainChain(run, taskRun, txManager); err != nil {
 		logger.Warnw("Failure while trying to validate chain",
 			run.ForLogger("error", err)...,
 		)
@@ -38,13 +36,13 @@ func markInProgressIfSufficientIncomingConfirmations(run *models.JobRun, taskRun
 	}
 }
 
-func validateOnMainChain(run *models.JobRun, taskRun *models.TaskRun, ethClient eth.Client) error {
+func validateOnMainChain(run *models.JobRun, taskRun *models.TaskRun, txManager store.TxManager) error {
 	txhash := run.RunRequest.TxHash
-	if txhash == nil || !taskRun.MinRequiredIncomingConfirmations.Valid || taskRun.MinRequiredIncomingConfirmations.Uint32 == 0 {
+	if txhash == nil || !taskRun.MinimumConfirmations.Valid || taskRun.MinimumConfirmations.Uint32 == 0 {
 		return nil
 	}
 
-	receipt, err := ethClient.TransactionReceipt(context.TODO(), *txhash)
+	receipt, err := txManager.GetTxReceipt(*txhash)
 	if err != nil {
 		return err
 	}
@@ -58,35 +56,34 @@ func validateOnMainChain(run *models.JobRun, taskRun *models.TaskRun, ethClient 
 	return nil
 }
 
-func updateTaskRunObservedIncomingConfirmations(currentHeight *utils.Big, jr *models.JobRun, taskRun *models.TaskRun) {
-	if !taskRun.MinRequiredIncomingConfirmations.Valid || jr.CreationHeight == nil || currentHeight == nil {
+func updateTaskRunConfirmations(currentHeight *utils.Big, jr *models.JobRun, taskRun *models.TaskRun) {
+	if !taskRun.MinimumConfirmations.Valid || jr.CreationHeight == nil || currentHeight == nil {
 		return
 	}
 
 	confs := blockConfirmations(currentHeight, jr.CreationHeight)
-	diff := utils.MinBigs(confs, big.NewInt(int64(taskRun.MinRequiredIncomingConfirmations.Uint32)))
+	diff := utils.MinBigs(confs, big.NewInt(int64(taskRun.MinimumConfirmations.Uint32)))
 
-	// diff's ceiling is guaranteed to be MaxUint32 since MinRequiredIncomingConfirmations
+	// diff's ceiling is guaranteed to be MaxUint32 since MinimumConfirmations
 	// ceiling is MaxUint32.
-	taskRun.ObservedIncomingConfirmations = clnull.Uint32From(uint32(diff.Int64()))
+	taskRun.Confirmations = clnull.Uint32From(uint32(diff.Int64()))
 }
 
-func invalidRequest(request models.RunRequest, receipt *types.Receipt) bool {
-	return models.ReceiptIsUnconfirmed(receipt) ||
-		(request.BlockHash != nil && *request.BlockHash != receipt.BlockHash)
+func invalidRequest(request models.RunRequest, receipt *eth.TxReceipt) bool {
+	return receipt.Unconfirmed() ||
+		(request.BlockHash != nil && *request.BlockHash != *receipt.BlockHash)
 }
 
-func meetsMinRequiredIncomingConfirmations(
+func meetsMinimumConfirmations(
 	run *models.JobRun,
 	taskRun *models.TaskRun,
 	currentHeight *utils.Big) bool {
-
-	if !taskRun.MinRequiredIncomingConfirmations.Valid || run.CreationHeight == nil || currentHeight == nil {
+	if !taskRun.MinimumConfirmations.Valid || run.CreationHeight == nil || currentHeight == nil {
 		return true
 	}
 
 	diff := blockConfirmations(currentHeight, run.CreationHeight)
-	return diff.Cmp(big.NewInt(int64(taskRun.MinRequiredIncomingConfirmations.Uint32))) >= 0
+	return diff.Cmp(big.NewInt(int64(taskRun.MinimumConfirmations.Uint32))) >= 0
 }
 
 func blockConfirmations(currentHeight, creationHeight *utils.Big) *big.Int {

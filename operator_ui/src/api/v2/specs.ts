@@ -72,6 +72,7 @@ export class Specs {
    */
   @boundMethod
   public getJobSpec(id: string): Promise<jsonapi.ApiResponse<models.JobSpec>> {
+    console.log(SHOW_ENDPOINT)
     return this.show({}, { specId: id })
   }
 

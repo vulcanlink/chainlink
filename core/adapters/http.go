@@ -14,12 +14,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/store"
-	"github.com/smartcontractkit/chainlink/core/store/models"
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"chainlink/core/logger"
+	"chainlink/core/store"
+	"chainlink/core/store/models"
+	"chainlink/core/utils"
 
-	"github.com/jpillora/backoff"
+	"github.com/avast/retry-go"
 )
 
 // HTTPGet requires a URL which is used for a GET request when the adapter is called.
@@ -194,70 +194,59 @@ func withRetry(
 	originalRequest *http.Request,
 	config HTTPRequestConfig,
 ) (responseBody []byte, statusCode int, err error) {
-	bb := &backoff.Backoff{
-		Min:    100,
-		Max:    20 * time.Minute, // We stop retrying on the number of attempts!
-		Jitter: true,
-	}
-	for {
-		responseBody, statusCode, err = makeHTTPCall(client, originalRequest, config)
-		if err == nil {
-			return responseBody, statusCode, nil
-		}
-		if uint(bb.Attempt())+1 >= config.maxAttempts { // Stop retrying.
-			return responseBody, statusCode, err
-		}
-		switch err.(type) {
-		// There is no point in retrying a request if the response was
-		// too large since it's likely that all retries will suffer the
-		// same problem
-		case *HTTPResponseTooLargeError:
-			return responseBody, statusCode, err
-		}
-		// Sleep and retry.
-		time.Sleep(bb.Duration())
-		logger.Debugw("http adapter error, will retry", "error", err.Error(), "attempt", bb.Attempt(), "timeout", config.timeout)
-	}
-}
+	err = retry.Do(
+		func() error {
+			ctx, cancel := context.WithTimeout(context.Background(), config.timeout)
+			defer cancel()
+			requestWithTimeout := originalRequest.Clone(ctx)
 
-func makeHTTPCall(
-	client *http.Client,
-	originalRequest *http.Request,
-	config HTTPRequestConfig,
-) (responseBody []byte, statusCode int, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), config.timeout)
-	defer cancel()
-	requestWithTimeout := originalRequest.Clone(ctx)
+			start := time.Now()
 
-	start := time.Now()
+			r, err := client.Do(requestWithTimeout)
+			if err != nil {
+				return err
+			}
+			defer r.Body.Close()
+			statusCode = r.StatusCode
+			elapsed := time.Since(start)
+			logger.Debugw(fmt.Sprintf("http adapter got %v in %s", statusCode, elapsed), "statusCode", statusCode, "timeElapsedSeconds", elapsed)
 
-	r, e := client.Do(requestWithTimeout)
-	if e != nil {
-		return nil, 0, e
-	}
-	defer logger.ErrorIfCalling(r.Body.Close)
+			source := newMaxBytesReader(r.Body, config.sizeLimit)
+			bytes, err := ioutil.ReadAll(source)
+			if err != nil {
+				logger.Errorf("http adapter error reading body: %v", err.Error())
+				return err
+			}
+			elapsed = time.Since(start)
+			logger.Debugw(fmt.Sprintf("http adapter finished after %s", elapsed), "statusCode", statusCode, "timeElapsedSeconds", elapsed)
 
-	statusCode = r.StatusCode
-	elapsed := time.Since(start)
-	logger.Debugw(fmt.Sprintf("http adapter got %v in %s", statusCode, elapsed), "statusCode", statusCode, "timeElapsedSeconds", elapsed)
+			responseBody = bytes
 
-	source := newMaxBytesReader(r.Body, config.sizeLimit)
-	bytes, e := ioutil.ReadAll(source)
-	if e != nil {
-		logger.Errorf("http adapter error reading body: %v", e.Error())
-		return nil, statusCode, e
-	}
-	elapsed = time.Since(start)
-	logger.Debugw(fmt.Sprintf("http adapter finished after %s", elapsed), "statusCode", statusCode, "timeElapsedSeconds", elapsed)
+			// Retry on 5xx since this might give a different result
+			if 500 <= r.StatusCode && r.StatusCode < 600 {
+				return &RemoteServerError{responseBody, statusCode}
+			}
 
-	responseBody = bytes
+			return nil
+		},
+		retry.Attempts(config.maxAttempts),
+		retry.RetryIf(func(err error) bool {
+			switch err.(type) {
+			// There is no point in retrying a request if the response was
+			// too large since it's likely that all retries will suffer the
+			// same problem
+			case *HTTPResponseTooLargeError:
+				return false
+			default:
+				return true
+			}
+		}),
+		retry.OnRetry(func(n uint, err error) {
+			logger.Debugw("http adapter error, will retry", "error", err.Error(), "attempt", n, "timeout", config.timeout)
+		}),
+	)
 
-	// Retry on 5xx since this might give a different result
-	if 500 <= r.StatusCode && r.StatusCode < 600 {
-		return responseBody, statusCode, &RemoteServerError{responseBody, statusCode}
-	}
-
-	return responseBody, statusCode, nil
+	return responseBody, statusCode, err
 }
 
 type RemoteServerError struct {
@@ -342,25 +331,26 @@ type QueryParameters url.Values
 
 // UnmarshalJSON implements the Unmarshaler interface
 func (qp *QueryParameters) UnmarshalJSON(input []byte) error {
-	var strs []string
+	values := url.Values{}
+	strs := []string{}
 	var err error
 
 	// input is a string like "someKey0=someVal0&someKey1=someVal1"
 	if utils.IsQuoted(input) {
 		var decoded string
-		unmErr := json.Unmarshal(input, &decoded)
-		if unmErr != nil {
+		err := json.Unmarshal(input, &decoded)
+		if err != nil {
 			return fmt.Errorf("unable to unmarshal query parameters: %s", input)
 		}
 		strs = strings.FieldsFunc(trimQuestion(decoded), splitQueryString)
 
 		// input is an array of strings like
 		// ["someKey0", "someVal0", "someKey1", "someVal1"]
-	} else if err = json.Unmarshal(input, &strs); err != nil {
-		return fmt.Errorf("unable to unmarshal query parameters: %s", input)
+	} else {
+		err = json.Unmarshal(input, &strs)
 	}
 
-	values, err := buildValues(strs)
+	values, err = buildValues(strs)
 	if err != nil {
 		return fmt.Errorf("unable to build query parameters: %s", input)
 	}
@@ -407,7 +397,7 @@ func (ep *ExtendedPath) UnmarshalJSON(input []byte) error {
 
 func defaultHTTPConfig(store *store.Store) HTTPRequestConfig {
 	return HTTPRequestConfig{
-		store.Config.DefaultHTTPTimeout().Duration(),
+		store.Config.DefaultHTTPTimeout(),
 		store.Config.DefaultMaxHTTPAttempts(),
 		store.Config.DefaultHTTPLimit(),
 		false,

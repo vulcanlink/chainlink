@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/store"
-	"github.com/smartcontractkit/chainlink/core/store/models"
+	"chainlink/core/logger"
+	"chainlink/core/store"
+	"chainlink/core/store/models"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -21,7 +21,7 @@ var (
 	})
 )
 
-//go:generate mockery --name JobSubscriber  --output ../internal/mocks/ --case=underscore
+//go:generate mockery -name JobSubscriber  -output ../internal/mocks/ -case=underscore
 
 // JobSubscriber listens for push notifications of event logs from the ethereum
 // node's websocket for specific jobs by subscribing to ethLogs.
@@ -35,35 +35,21 @@ type JobSubscriber interface {
 
 // jobSubscriber implementation
 type jobSubscriber struct {
-	store            *store.Store
-	jobSubscriptions map[string]JobSubscription
-	jobsMutex        *sync.RWMutex
-	runManager       RunManager
-	jobResumer       SleeperTask
-	nextBlockWorker  *nextBlockWorker
+	store                     *store.Store
+	jobSubscriptions          map[string]JobSubscription
+	jobsMutex                 *sync.RWMutex
+	runManager                RunManager
+	jobResumer                SleeperTask
+	resumeRunsOnNewHeadWorker *resumeRunsOnNewHeadWorker
 }
 
-type nextBlockWorker struct {
+type resumeRunsOnNewHeadWorker struct {
 	runManager RunManager
 	head       big.Int
-	headMtx    sync.RWMutex
 }
 
-func (b *nextBlockWorker) getHead() big.Int {
-	b.headMtx.RLock()
-	defer b.headMtx.RUnlock()
-	return b.head
-}
-
-func (b *nextBlockWorker) setHead(h big.Int) {
-	b.headMtx.Lock()
-	b.head = h
-	b.headMtx.Unlock()
-}
-
-func (b *nextBlockWorker) Work() {
-	head := b.getHead()
-	err := b.runManager.ResumeAllPendingNextBlock(&head)
+func (rw *resumeRunsOnNewHeadWorker) Work() {
+	err := rw.runManager.ResumeAllConfirming(&rw.head)
 	if err != nil {
 		logger.Errorw("Failed to resume confirming tasks on new head", "error", err)
 	}
@@ -71,14 +57,14 @@ func (b *nextBlockWorker) Work() {
 
 // NewJobSubscriber returns a new job subscriber.
 func NewJobSubscriber(store *store.Store, runManager RunManager) JobSubscriber {
-	b := &nextBlockWorker{runManager: runManager}
+	rw := &resumeRunsOnNewHeadWorker{runManager: runManager}
 	js := &jobSubscriber{
-		store:            store,
-		runManager:       runManager,
-		jobSubscriptions: map[string]JobSubscription{},
-		jobsMutex:        &sync.RWMutex{},
-		jobResumer:       NewSleeperTask(b),
-		nextBlockWorker:  b,
+		store:                     store,
+		runManager:                runManager,
+		jobSubscriptions:          map[string]JobSubscription{},
+		jobsMutex:                 &sync.RWMutex{},
+		jobResumer:                NewSleeperTask(rw),
+		resumeRunsOnNewHeadWorker: rw,
 	}
 	return js
 }
@@ -96,7 +82,6 @@ func (js *jobSubscriber) AddJob(job models.JobSpec, bn *models.Head) error {
 
 	sub, err := StartJobSubscription(job, bn, js.store, js.runManager)
 	if err != nil {
-		js.store.UpsertErrorFor(job.ID, "Unable to start job subscription")
 		return err
 	}
 	js.addSubscription(sub)
@@ -141,15 +126,10 @@ func (js *jobSubscriber) addSubscription(sub JobSubscription) {
 // Connect connects the jobs to the ethereum node by creating corresponding subscriptions.
 func (js *jobSubscriber) Connect(bn *models.Head) error {
 	var merr error
-	err := js.store.Jobs(
-		func(j *models.JobSpec) bool {
-			merr = multierr.Append(merr, js.AddJob(*j, bn))
-			return true
-		},
-		models.InitiatorEthLog,
-		models.InitiatorRandomnessLog,
-		models.InitiatorRunLog,
-	)
+	err := js.store.Jobs(func(j *models.JobSpec) bool {
+		merr = multierr.Append(merr, js.AddJob(*j, bn))
+		return true
+	}, models.InitiatorEthLog, models.InitiatorRunLog, models.InitiatorServiceAgreementExecutionLog)
 	return multierr.Append(merr, err)
 }
 
@@ -165,8 +145,8 @@ func (js *jobSubscriber) Disconnect() {
 	js.jobSubscriptions = map[string]JobSubscription{}
 }
 
-// OnNewLongestChain resumes all pending job runs based on the new head activity.
-func (js *jobSubscriber) OnNewLongestChain(head models.Head) {
-	js.nextBlockWorker.setHead(*head.ToInt())
+// OnNewHead resumes all pending job runs based on the new head activity.
+func (js *jobSubscriber) OnNewHead(head *models.Head) {
+	js.resumeRunsOnNewHeadWorker.head = *head.ToInt()
 	js.jobResumer.WakeUp()
 }

@@ -1,10 +1,6 @@
 import { AppState } from 'reducers'
 import build from 'redux-object'
-import { JobSpec } from 'operator_ui'
 
-export default (
-  { jobs }: Pick<AppState, 'jobs'>,
-  id: string,
-): JobSpec | undefined => {
+export default ({ jobs }: Pick<AppState, 'jobs'>, id: string) => {
   return build(jobs, 'items', id, { eager: true })
 }

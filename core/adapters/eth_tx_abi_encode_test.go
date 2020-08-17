@@ -14,11 +14,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink/core/adapters"
-	"github.com/smartcontractkit/chainlink/core/internal/cltest"
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"chainlink/core/adapters"
+	ethpkg "chainlink/core/eth"
+	"chainlink/core/internal/cltest"
+	"chainlink/core/utils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -70,11 +70,24 @@ func TestEthTxABIEncodeAdapter_Perform_ConfirmedWithJSON(t *testing.T) {
 		FunctionABI: abi.Method{
 			Name:    "verifyVRFProof",
 			RawName: "verifyVRFProof",
+			Const:   false,
 			Inputs: []abi.Argument{
-				{Name: "gammaX", Type: uint256Type},
-				{Name: "gammaY", Type: uint256Type},
-				{Name: "c", Type: uint256Type},
-				{Name: "s", Type: uint256Type},
+				abi.Argument{
+					Name: "gammaX",
+					Type: uint256Type,
+				},
+				abi.Argument{
+					Name: "gammaY",
+					Type: uint256Type,
+				},
+				abi.Argument{
+					Name: "c",
+					Type: uint256Type,
+				},
+				abi.Argument{
+					Name: "s",
+					Type: uint256Type,
+				},
 			},
 			Outputs: []abi.Argument{},
 		},
@@ -114,10 +127,7 @@ func TestEthTxABIEncodeAdapter_Perform_ConfirmedWithJSON(t *testing.T) {
 
 	expectedAsHex := strings.Join(append(selector, values...), "")
 	t.Parallel()
-	app, cleanup := cltest.NewApplicationWithKey(t,
-		cltest.LenientEthMock,
-		cltest.EthMockRegisterGetBalance,
-	)
+	app, cleanup := cltest.NewApplicationWithKey(t)
 	defer cleanup()
 	store := app.Store
 
@@ -128,18 +138,18 @@ func TestEthTxABIEncodeAdapter_Perform_ConfirmedWithJSON(t *testing.T) {
 	require.NoError(t, app.StartAndConnect())
 
 	hash := cltest.NewHash()
-	sentAt := int64(23456)
+	sentAt := uint64(23456)
 	confirmed := sentAt + 1
 	app.EthMock.Register("eth_sendRawTransaction", hash,
 		func(_ interface{}, data ...interface{}) error {
 			rlp := data[0].([]interface{})[0].(string)
-			tx, e := utils.DecodeEthereumTx(rlp)
-			assert.NoError(t, e)
+			tx, err := utils.DecodeEthereumTx(rlp)
+			assert.NoError(t, err)
 			assert.Equal(t, adapterUnderTest.Address.String(), tx.To().String())
 			assert.Equal(t, expectedAsHex, hexutil.Encode(tx.Data()))
 			return nil
 		})
-	receipt := &gethTypes.Receipt{TxHash: hash, BlockNumber: big.NewInt(confirmed)}
+	receipt := ethpkg.TxReceipt{Hash: hash, BlockNumber: cltest.Int(confirmed)}
 	app.EthMock.Register("eth_getTransactionReceipt", receipt)
 	input := cltest.NewRunInputWithString(t, rawInput)
 	responseData := adapterUnderTest.Perform(input, store)
@@ -148,7 +158,6 @@ func TestEthTxABIEncodeAdapter_Perform_ConfirmedWithJSON(t *testing.T) {
 	assert.NoError(t, err)
 	app.EthMock.EventuallyAllCalled(t)
 	txs, err := store.TxFrom(from)
-	assert.NoError(t, err, "failed to retrieve transactions for address 0x%x", from)
 	require.Len(t, txs, 1)
 	assert.Len(t, txs[0].Attempts, 1)
 }

@@ -10,10 +10,12 @@ import build from 'redux-object'
 import { DispatchBinding } from '@chainlink/ts-helpers'
 import { JobRun } from 'explorer/models'
 import { fetchJobRuns } from '../../actions/jobRuns'
-import List, { Props as ListProps } from '../../components/JobRuns/List'
-import { DEFAULT_ROWS_PER_PAGE } from '../../components/Table'
+import List from '../../components/JobRuns/List'
+import { ChangePageEvent } from '../../components/Table'
 import { AppState } from '../../reducers'
-import { searchQuery } from '../../utils/searchQuery'
+
+const EMPTY_MSG =
+  "We couldn't find any results for your search query. Try again with the job id, run id, requester, requester id or transaction hash"
 
 const styles = ({ spacing, breakpoints }: Theme) =>
   createStyles({
@@ -37,10 +39,9 @@ interface OwnProps {
 }
 
 interface StateProps {
-  loading: AppState['jobRuns']['loading']
-  error: AppState['jobRuns']['error']
+  query: AppState['search']['query']
   jobRuns?: JobRun[]
-  count?: AppState['jobRunsIndex']['count']
+  count: AppState['jobRunsIndex']['count']
 }
 
 interface DispatchProps {
@@ -53,40 +54,32 @@ interface Props
     StateProps,
     DispatchProps {}
 
-const LOADING_MSG = 'Loading search results...'
-const EMPTY_MSG =
-  "We couldn't find any results for your search query. Try again with the job id, run id, requester, requester id or transaction hash"
-
 const Index = withStyles(styles)(
   ({
-    loading,
-    error,
     fetchJobRuns,
-    rowsPerPage = DEFAULT_ROWS_PER_PAGE,
+    query,
+    rowsPerPage = 10,
     classes,
     jobRuns,
     count,
   }: Props) => {
     const [currentPage, setCurrentPage] = useState(0)
-    const onChangePage: ListProps['onChangePage'] = (_event, page) => {
+    const onChangePage = (_event: ChangePageEvent, page: number) => {
       setCurrentPage(page)
+      fetchJobRuns(query, page + 1, rowsPerPage)
     }
 
     useEffect(() => {
-      fetchJobRuns(searchQuery(), currentPage + 1, rowsPerPage)
-    }, [fetchJobRuns, currentPage, rowsPerPage])
+      fetchJobRuns(query, currentPage + 1, rowsPerPage)
+    }, [fetchJobRuns, query, currentPage, rowsPerPage])
 
     return (
       <div className={classes.container}>
         <List
-          loading={loading}
-          error={error}
           currentPage={currentPage}
           jobRuns={jobRuns}
-          rowsPerPage={rowsPerPage}
           count={count}
           onChangePage={onChangePage}
-          loadingMsg={LOADING_MSG}
           emptyMsg={EMPTY_MSG}
         />
       </div>
@@ -94,18 +87,22 @@ const Index = withStyles(styles)(
   },
 )
 
-function jobRunsSelector({
+const jobRunsSelector = ({
   jobRunsIndex,
   jobRuns,
   chainlinkNodes,
-}: AppState): JobRun[] | undefined {
-  return jobRunsIndex.items?.map(id => {
-    const document = {
-      jobRuns: jobRuns.items,
-      chainlinkNodes: chainlinkNodes.items,
-    }
-    return build(document, 'jobRuns', id)
-  })
+}: AppState): JobRun[] | undefined => {
+  if (jobRunsIndex.items) {
+    return jobRunsIndex.items.map((id: string) => {
+      const document = {
+        jobRuns: jobRuns.items,
+        chainlinkNodes: chainlinkNodes.items,
+      }
+      return build(document, 'jobRuns', id)
+    })
+  }
+
+  return
 }
 
 const mapStateToProps: MapStateToProps<
@@ -114,10 +111,9 @@ const mapStateToProps: MapStateToProps<
   AppState
 > = state => {
   return {
+    query: state.search.query,
     jobRuns: jobRunsSelector(state),
     count: state.jobRunsIndex.count,
-    loading: state.jobRuns.loading,
-    error: state.jobRuns.error,
   }
 }
 
@@ -125,4 +121,6 @@ const mapDispatchToProps: MapDispatchToProps<DispatchProps, OwnProps> = {
   fetchJobRuns,
 }
 
-export default connect(mapStateToProps, mapDispatchToProps)(Index)
+const ConnectedIndex = connect(mapStateToProps, mapDispatchToProps)(Index)
+
+export default ConnectedIndex

@@ -101,7 +101,6 @@ func TestEVMWordSignedBigInt(t *testing.T) {
 
 	val, err = EVMWordSignedBigInt(new(big.Int).Add(MaxInt256, big.NewInt(1)))
 	assert.Error(t, err)
-	assert.Nil(t, val)
 }
 
 func TestEVMWordBigInt(t *testing.T) {
@@ -119,7 +118,6 @@ func TestEVMWordBigInt(t *testing.T) {
 
 	val, err = EVMWordBigInt(new(big.Int).SetInt64(-1))
 	assert.Error(t, err)
-	assert.Nil(t, val)
 
 	val, err = EVMWordBigInt(MaxUint256)
 	assert.NoError(t, err)
@@ -127,7 +125,6 @@ func TestEVMWordBigInt(t *testing.T) {
 
 	val, err = EVMWordBigInt(new(big.Int).Add(MaxUint256, big.NewInt(1)))
 	assert.Error(t, err)
-	assert.Nil(t, val)
 }
 
 func TestEVMTranscodeBytes(t *testing.T) {
@@ -195,7 +192,7 @@ func TestEVMTranscodeBytes_ErrorsOnOverflow(t *testing.T) {
 	input := gjson.Parse("1e+300")
 	_, err := EVMTranscodeBytes(input)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "overflow saving signed big.Int to EVM word")
+	assert.Contains(t, err.Error(), "Overflow saving signed big.Int to EVM word")
 }
 
 func TestEVMTranscodeBytes_UnsupportedEncoding(t *testing.T) {

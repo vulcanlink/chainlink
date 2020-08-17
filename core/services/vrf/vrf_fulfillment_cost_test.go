@@ -1,37 +1,29 @@
-package vrf_test
+package vrf
 
 import (
-	"math/big"
 	"testing"
-
-	"github.com/smartcontractkit/chainlink/core/services/vrf"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestMeasureFulfillmentGasCost(t *testing.T) {
+func TestMeasureFulfillmenttGasCost(t *testing.T) {
 	coordinator := deployCoordinator(t)
 	keyHash, _, fee := registerProvingKey(t, coordinator)
 	// Set up a request to fulfill
 	log := requestRandomness(t, coordinator, keyHash, fee, seed)
-	preSeed, err := vrf.BigToSeed(log.Seed)
-	require.NoError(t, err, "pre-seed %x out of range", preSeed)
-	s := vrf.PreSeedData{
-		PreSeed:   preSeed,
-		BlockHash: log.Raw.Raw.BlockHash,
-		BlockNum:  log.Raw.Raw.BlockNumber,
-	}
-	proofBlob, err := vrf.GenerateProofResponseWithNonce(rawSecretKey, s,
-		big.NewInt(1) /* nonce */)
+	proof, err := generateProofWithNonce(secretKey, log.Seed, one /* nonce */)
 	require.NoError(t, err, "could not generate VRF proof!")
-	coordinator.backend.Commit() // Work around simbackend/EVM block number bug
+	// Set up the proof with which to fulfill request
+	proofBlob, err := proof.MarshalForSolidityVerifier()
+	require.NoError(t, err, "could not marshal VRF proof for VRFCoordinator!")
+
 	estimate := estimateGas(t, coordinator.backend, coordinator.neil.From,
 		coordinator.rootContractAddress, coordinator.coordinatorABI,
 		"fulfillRandomnessRequest", proofBlob[:])
 
-	assert.Greater(t, estimate, uint64(108000),
+	assert.Greater(t, estimate, uint64(148000),
 		"fulfillRandomness tx cost less gas than expected")
-	assert.Less(t, estimate, uint64(400000),
+	assert.Less(t, estimate, uint64(300000),
 		"fulfillRandomness tx cost more gas than expected")
 }

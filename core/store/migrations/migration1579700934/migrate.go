@@ -9,4 +9,5 @@ func Migrate(tx *gorm.DB) error {
 	return tx.Exec(`
 	  ALTER TABLE initiators ADD COLUMN "polling_interval" BigInt;
 	`).Error
+	return nil
 }

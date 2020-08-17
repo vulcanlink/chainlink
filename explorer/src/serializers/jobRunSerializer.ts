@@ -3,7 +3,6 @@ import {
   SerializerOptions,
 } from 'jsonapi-serializer'
 import { JobRun } from '../entity/JobRun'
-import { Config } from '../config'
 
 export const BASE_ATTRIBUTES = [
   'chainlinkNode',
@@ -39,7 +38,7 @@ export const taskRuns = {
   ],
 }
 
-const ETHERSCAN_HOST = Config.etherscanHost()
+const ETHERSCAN_HOST = process.env.ETHERSCAN_HOST || 'ropsten.etherscan.io'
 
 const jobRunSerializer = (run: JobRun) => {
   const opts = {

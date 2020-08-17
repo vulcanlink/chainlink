@@ -1,4 +1,4 @@
-pragma solidity 0.6.6;
+pragma solidity 0.6.2;
 
 import "../interfaces/LinkTokenInterface.sol";
 import "../VRFCoordinator.sol";
@@ -14,7 +14,7 @@ contract VRFConsumer is VRFConsumerBase {
     VRFConsumerBase(_vrfCoordinator, _link) { /* empty */ }
 
   function fulfillRandomness(bytes32 _requestId, uint256 _randomness)
-    internal override
+    external override
   {
     randomnessOutput = _randomness;
     requestId = _requestId;

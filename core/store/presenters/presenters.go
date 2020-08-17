@@ -5,22 +5,22 @@ package presenters
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/smartcontractkit/chainlink/core/assets"
-	"github.com/smartcontractkit/chainlink/core/auth"
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/services/synchronization"
-	"github.com/smartcontractkit/chainlink/core/store"
-	"github.com/smartcontractkit/chainlink/core/store/models"
-	"github.com/smartcontractkit/chainlink/core/store/orm"
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"chainlink/core/assets"
+	"chainlink/core/auth"
+	"chainlink/core/logger"
+	"chainlink/core/services/synchronization"
+	"chainlink/core/store"
+	"chainlink/core/store/models"
+	"chainlink/core/store/orm"
+	"chainlink/core/utils"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
@@ -84,15 +84,11 @@ func showBalanceForAccount(store *store.Store, account accounts.Account, balance
 func getBalance(store *store.Store, account accounts.Account, balanceType requestType) (balanceable, error) {
 	switch balanceType {
 	case ethRequest:
-		bal, err := store.EthClient.BalanceAt(context.TODO(), account.Address, nil)
-		if err != nil {
-			return nil, err
-		}
-		return (*assets.Eth)(bal), nil
+		return store.TxManager.GetEthBalance(account.Address)
 	case linkRequest:
 		return store.TxManager.GetLINKBalance(account.Address)
 	}
-	return nil, fmt.Errorf("impossible to get balance for %T with value %v", balanceType, balanceType)
+	return nil, fmt.Errorf("Impossible to get balance for %T with value %v", balanceType, balanceType)
 }
 
 type balanceable interface {
@@ -130,39 +126,38 @@ type ConfigWhitelist struct {
 
 // Whitelist contains the supported environment variables
 type Whitelist struct {
-	AllowOrigins                     string          `json:"allowOrigins"`
-	BlockBackfillDepth               uint64          `json:"blockBackfillDepth"`
-	BridgeResponseURL                string          `json:"bridgeResponseURL,omitempty"`
-	ChainID                          *big.Int        `json:"ethChainId"`
-	ClientNodeURL                    string          `json:"clientNodeUrl"`
-	DatabaseTimeout                  models.Duration `json:"databaseTimeout"`
-	Dev                              bool            `json:"chainlinkDev"`
-	EthereumURL                      string          `json:"ethUrl"`
-	EthGasBumpThreshold              uint64          `json:"ethGasBumpThreshold"`
-	EthGasBumpWei                    *big.Int        `json:"ethGasBumpWei"`
-	EthGasPriceDefault               *big.Int        `json:"ethGasPriceDefault"`
-	ExplorerURL                      string          `json:"explorerUrl"`
-	JSONConsole                      bool            `json:"jsonConsole"`
-	LinkContractAddress              string          `json:"linkContractAddress"`
-	LogLevel                         orm.LogLevel    `json:"logLevel"`
-	LogSQLMigrations                 bool            `json:"logSqlMigrations"`
-	LogSQLStatements                 bool            `json:"logSqlStatements"`
-	LogToDisk                        bool            `json:"logToDisk"`
-	MaxRPCCallsPerSecond             uint64          `json:"maxRPCCallsPerSecond"`
-	MinimumContractPayment           *assets.Link    `json:"minimumContractPayment"`
-	MinimumRequestExpiration         uint64          `json:"minimumRequestExpiration"`
-	MinIncomingConfirmations         uint32          `json:"minIncomingConfirmations"`
-	MinRequiredOutgoingConfirmations uint64          `json:"minOutgoingConfirmations"`
-	OracleContractAddress            *common.Address `json:"oracleContractAddress"`
-	Port                             uint16          `json:"chainlinkPort"`
-	ReaperExpiration                 models.Duration `json:"reaperExpiration"`
-	ReplayFromBlock                  int64           `json:"replayFromBlock"`
-	RootDir                          string          `json:"root"`
-	SessionTimeout                   models.Duration `json:"sessionTimeout"`
-	TLSHost                          string          `json:"chainlinkTLSHost"`
-	TLSPort                          uint16          `json:"chainlinkTLSPort"`
-	TLSRedirect                      bool            `json:"chainlinkTLSRedirect"`
-	TxAttemptLimit                   uint16          `json:"txAttemptLimit"`
+	AllowOrigins             string          `json:"allowOrigins"`
+	BridgeResponseURL        string          `json:"bridgeResponseURL,omitempty"`
+	ChainID                  *big.Int        `json:"ethChainId"`
+	ClientNodeURL            string          `json:"clientNodeUrl"`
+	DatabaseTimeout          time.Duration   `json:"databaseTimeout"`
+	Dev                      bool            `json:"chainlinkDev"`
+	EthereumURL              string          `json:"ethUrl"`
+	EthGasBumpThreshold      uint64          `json:"ethGasBumpThreshold"`
+	EthGasBumpWei            *big.Int        `json:"ethGasBumpWei"`
+	EthGasPriceDefault       *big.Int        `json:"ethGasPriceDefault"`
+	ExplorerURL              string          `json:"explorerUrl"`
+	JSONConsole              bool            `json:"jsonConsole"`
+	LinkContractAddress      string          `json:"linkContractAddress"`
+	LogLevel                 orm.LogLevel    `json:"logLevel"`
+	LogSQLMigrations         bool            `json:"logSqlMigrations"`
+	LogSQLStatements         bool            `json:"logSqlStatements"`
+	LogToDisk                bool            `json:"logToDisk"`
+	MaxRPCCallsPerSecond     uint64          `json:"maxRPCCallsPerSecond"`
+	MinimumContractPayment   *assets.Link    `json:"minimumContractPayment"`
+	MinimumRequestExpiration uint64          `json:"minimumRequestExpiration"`
+	MinIncomingConfirmations uint32          `json:"minIncomingConfirmations"`
+	MinOutgoingConfirmations uint64          `json:"minOutgoingConfirmations"`
+	OracleContractAddress    *common.Address `json:"oracleContractAddress"`
+	Port                     uint16          `json:"chainlinkPort"`
+	ReaperExpiration         time.Duration   `json:"reaperExpiration"`
+	ReplayFromBlock          int64           `json:"replayFromBlock"`
+	RootDir                  string          `json:"root"`
+	SessionTimeout           time.Duration   `json:"sessionTimeout"`
+	TLSHost                  string          `json:"chainlinkTLSHost"`
+	TLSPort                  uint16          `json:"chainlinkTLSPort"`
+	TLSRedirect              bool            `json:"chainlinkTLSRedirect"`
+	TxAttemptLimit           uint16          `json:"txAttemptLimit"`
 }
 
 // NewConfigWhitelist creates an instance of ConfigWhitelist
@@ -180,39 +175,38 @@ func NewConfigWhitelist(store *store.Store) (ConfigWhitelist, error) {
 	return ConfigWhitelist{
 		AccountAddress: account.Address.Hex(),
 		Whitelist: Whitelist{
-			AllowOrigins:                     config.AllowOrigins(),
-			BlockBackfillDepth:               config.BlockBackfillDepth(),
-			BridgeResponseURL:                config.BridgeResponseURL().String(),
-			ChainID:                          config.ChainID(),
-			ClientNodeURL:                    config.ClientNodeURL(),
-			Dev:                              config.Dev(),
-			DatabaseTimeout:                  config.DatabaseTimeout(),
-			EthereumURL:                      config.EthereumURL(),
-			EthGasBumpThreshold:              config.EthGasBumpThreshold(),
-			EthGasBumpWei:                    config.EthGasBumpWei(),
-			EthGasPriceDefault:               config.EthGasPriceDefault(),
-			JSONConsole:                      config.JSONConsole(),
-			LinkContractAddress:              config.LinkContractAddress(),
-			ExplorerURL:                      explorerURL,
-			LogLevel:                         config.LogLevel(),
-			LogToDisk:                        config.LogToDisk(),
-			LogSQLStatements:                 config.LogSQLStatements(),
-			LogSQLMigrations:                 config.LogSQLMigrations(),
-			MaxRPCCallsPerSecond:             config.MaxRPCCallsPerSecond(),
-			MinimumContractPayment:           config.MinimumContractPayment(),
-			MinimumRequestExpiration:         config.MinimumRequestExpiration(),
-			MinIncomingConfirmations:         config.MinIncomingConfirmations(),
-			MinRequiredOutgoingConfirmations: config.MinRequiredOutgoingConfirmations(),
-			OracleContractAddress:            config.OracleContractAddress(),
-			Port:                             config.Port(),
-			ReaperExpiration:                 config.ReaperExpiration(),
-			ReplayFromBlock:                  config.ReplayFromBlock(),
-			RootDir:                          config.RootDir(),
-			SessionTimeout:                   config.SessionTimeout(),
-			TLSHost:                          config.TLSHost(),
-			TLSPort:                          config.TLSPort(),
-			TLSRedirect:                      config.TLSRedirect(),
-			TxAttemptLimit:                   config.TxAttemptLimit(),
+			AllowOrigins:             config.AllowOrigins(),
+			BridgeResponseURL:        config.BridgeResponseURL().String(),
+			ChainID:                  config.ChainID(),
+			ClientNodeURL:            config.ClientNodeURL(),
+			Dev:                      config.Dev(),
+			DatabaseTimeout:          config.DatabaseTimeout(),
+			EthereumURL:              config.EthereumURL(),
+			EthGasBumpThreshold:      config.EthGasBumpThreshold(),
+			EthGasBumpWei:            config.EthGasBumpWei(),
+			EthGasPriceDefault:       config.EthGasPriceDefault(),
+			JSONConsole:              config.JSONConsole(),
+			LinkContractAddress:      config.LinkContractAddress(),
+			ExplorerURL:              explorerURL,
+			LogLevel:                 config.LogLevel(),
+			LogToDisk:                config.LogToDisk(),
+			LogSQLStatements:         config.LogSQLStatements(),
+			LogSQLMigrations:         config.LogSQLMigrations(),
+			MaxRPCCallsPerSecond:     config.MaxRPCCallsPerSecond(),
+			MinimumContractPayment:   config.MinimumContractPayment(),
+			MinimumRequestExpiration: config.MinimumRequestExpiration(),
+			MinIncomingConfirmations: config.MinIncomingConfirmations(),
+			MinOutgoingConfirmations: config.MinOutgoingConfirmations(),
+			OracleContractAddress:    config.OracleContractAddress(),
+			Port:                     config.Port(),
+			ReaperExpiration:         config.ReaperExpiration(),
+			ReplayFromBlock:          config.ReplayFromBlock(),
+			RootDir:                  config.RootDir(),
+			SessionTimeout:           config.SessionTimeout(),
+			TLSHost:                  config.TLSHost(),
+			TLSPort:                  config.TLSPort(),
+			TLSRedirect:              config.TLSRedirect(),
+			TxAttemptLimit:           config.TxAttemptLimit(),
 		},
 	}, nil
 }
@@ -270,8 +264,7 @@ func (c *ConfigWhitelist) SetID(value string) error {
 // the total link earned from that job
 type JobSpec struct {
 	models.JobSpec
-	Errors   []models.JobSpecError `json:"errors"`
-	Earnings *assets.Link          `json:"earnings"`
+	Earnings *assets.Link `json:"earnings"`
 }
 
 // MarshalJSON returns the JSON data of the Job and its Initiators.
@@ -364,6 +357,8 @@ func initiatorParams(i Initiator) (interface{}, error) {
 	switch i.Type {
 	case models.InitiatorWeb:
 		return struct{}{}, nil
+	case models.InitiatorServiceAgreementExecutionLog:
+		return struct{}{}, nil
 	case models.InitiatorCron:
 		return struct {
 			Schedule models.Cron `json:"schedule"`
@@ -385,20 +380,17 @@ func initiatorParams(i Initiator) (interface{}, error) {
 		}{i.Name}, nil
 	case models.InitiatorFluxMonitor:
 		return struct {
-			Address           common.Address         `json:"address"`
-			RequestData       models.JSON            `json:"requestData"`
-			Feeds             models.JSON            `json:"feeds"`
-			Threshold         float32                `json:"threshold"`
-			AbsoluteThreshold float32                `json:"absoluteThreshold"`
-			Precision         int32                  `json:"precision"`
-			PollTimer         models.PollTimerConfig `json:"pollTimer,omitempty"`
-			IdleTimer         models.IdleTimerConfig `json:"idleTimer,omitempty"`
-		}{i.Address, i.RequestData, i.Feeds, i.Threshold, i.AbsoluteThreshold,
-			i.Precision, i.PollTimer, i.IdleTimer}, nil
+			Address         common.Address  `json:"address"`
+			RequestData     models.JSON     `json:"requestData"`
+			Feeds           models.JSON     `json:"feeds"`
+			Threshold       float32         `json:"threshold"`
+			Precision       int32           `json:"precision"`
+			PollingInterval models.Duration `json:"pollingInterval"`
+		}{i.Address, i.RequestData, i.Feeds, i.Threshold, i.Precision, i.PollingInterval}, nil
 	case models.InitiatorRandomnessLog:
 		return struct{ Address common.Address }{i.Address}, nil
 	default:
-		return nil, fmt.Errorf("cannot marshal unsupported initiator type '%v'", i.Type)
+		return nil, fmt.Errorf("Cannot marshal unsupported initiator type '%v'", i.Type)
 	}
 }
 
@@ -470,7 +462,7 @@ type ServiceAgreementPresentation struct {
 	ID            string             `json:"id"`
 	CreatedAt     string             `json:"createdAt"`
 	Encumbrance   models.Encumbrance `json:"encumbrance"`
-	EncumbranceID int64              `json:"encumbranceID"`
+	EncumbranceID uint               `json:"encumbranceID"`
 	RequestBody   string             `json:"requestBody"`
 	Signature     string             `json:"signature"`
 	JobSpec       models.JobSpec     `json:"jobSpec"`
@@ -594,7 +586,7 @@ func NewTx(tx *models.Tx) Tx {
 		GasLimit:  strconv.FormatUint(tx.GasLimit, 10),
 		GasPrice:  tx.GasPrice.String(),
 		Hash:      tx.Hash,
-		Hex:       hexutil.Encode(tx.SignedRawTx),
+		Hex:       tx.SignedRawTx,
 		Nonce:     strconv.FormatUint(tx.Nonce, 10),
 		SentAt:    strconv.FormatUint(tx.SentAt, 10),
 		To:        &tx.To,

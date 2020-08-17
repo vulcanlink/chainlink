@@ -3,44 +3,34 @@ package models
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink/core/assets"
+	"chainlink/core/assets"
 
 	"github.com/araddon/dateparse"
+	"github.com/jinzhu/gorm"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/fxamacker/cbor/v2"
-	"github.com/robfig/cron/v3"
+	"github.com/mrwonko/cron"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
-
-// CronParser is the global parser for crontabs.
-// It accepts the standard 5 field cron syntax as well as an optional 6th field
-// at the front to represent seconds.
-var CronParser cron.Parser
-
-func init() {
-	cronParserSpec := cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor
-	CronParser = cron.NewParser(cronParserSpec)
-}
 
 // RunStatus is a string that represents the run status
 type RunStatus string
 
 const (
 	// RunStatusUnstarted is the default state of any run status.
-	RunStatusUnstarted = RunStatus("unstarted")
+	RunStatusUnstarted = RunStatus("")
 	// RunStatusInProgress is used for when a run is actively being executed.
 	RunStatusInProgress = RunStatus("in_progress")
-	// RunStatusPendingIncomingConfirmations is used for when a run is awaiting for incoming block confirmations
-	// e.g. waiting for the log event to be N blocks deep
-	RunStatusPendingIncomingConfirmations = RunStatus("pending_incoming_confirmations")
+	// RunStatusPendingConfirmations is used for when a run is awaiting for block confirmations.
+	RunStatusPendingConfirmations = RunStatus("pending_confirmations")
 	// RunStatusPendingConnection states that the run is waiting on a connection to the block chain.
 	RunStatusPendingConnection = RunStatus("pending_connection")
 	// RunStatusPendingBridge is used for when a run is waiting on the completion
@@ -48,9 +38,6 @@ const (
 	RunStatusPendingBridge = RunStatus("pending_bridge")
 	// RunStatusPendingSleep is used for when a run is waiting on a sleep function to finish.
 	RunStatusPendingSleep = RunStatus("pending_sleep")
-	// RunStatusPendingOutgoingConfirmations is used for when a run is waiting for outgoing block confirmations
-	// e.g. we have sent a transaction using ethtx and are now waiting for it to be N blocks deep
-	RunStatusPendingOutgoingConfirmations = RunStatus("pending_outgoing_confirmations")
 	// RunStatusErrored is used for when a run has errored and will not complete.
 	RunStatusErrored = RunStatus("errored")
 	// RunStatusCompleted is used for when a run has successfully completed execution.
@@ -69,9 +56,9 @@ func (s RunStatus) PendingBridge() bool {
 	return s == RunStatusPendingBridge
 }
 
-// PendingIncomingConfirmations returns true if the status is pending_incoming_confirmations.
-func (s RunStatus) PendingIncomingConfirmations() bool {
-	return s == RunStatusPendingIncomingConfirmations
+// PendingConfirmations returns true if the status is pending_confirmations.
+func (s RunStatus) PendingConfirmations() bool {
+	return s == RunStatusPendingConfirmations
 }
 
 // PendingConnection returns true if the status is pending_connection.
@@ -82,11 +69,6 @@ func (s RunStatus) PendingConnection() bool {
 // PendingSleep returns true if the status is pending_sleep.
 func (s RunStatus) PendingSleep() bool {
 	return s == RunStatusPendingSleep
-}
-
-// PendingOutgoingConfirmations returns true if the status is pending_incoming_confirmations.
-func (s RunStatus) PendingOutgoingConfirmations() bool {
-	return s == RunStatusPendingOutgoingConfirmations
 }
 
 // Completed returns true if the status is RunStatusCompleted.
@@ -106,7 +88,7 @@ func (s RunStatus) Errored() bool {
 
 // Pending returns true if the status is pending external or confirmations.
 func (s RunStatus) Pending() bool {
-	return s.PendingBridge() || s.PendingIncomingConfirmations() || s.PendingOutgoingConfirmations() || s.PendingSleep() || s.PendingConnection()
+	return s.PendingBridge() || s.PendingConfirmations() || s.PendingSleep() || s.PendingConnection()
 }
 
 // Finished returns true if the status is final and can't be changed.
@@ -131,14 +113,12 @@ func (s RunStatus) Value() (driver.Value, error) {
 
 // Scan reads the database value and returns an instance.
 func (s *RunStatus) Scan(value interface{}) error {
-	switch v := value.(type) {
-	case []byte:
-		*s = RunStatus(string(v))
-	case string:
-		*s = RunStatus(v)
-	default:
-		return fmt.Errorf("unable to convert %#v of %T to RunStatus", value, value)
+	temp, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("Unable to convert %v of %T to RunStatus", value, value)
 	}
+
+	*s = RunStatus(temp)
 	return nil
 }
 
@@ -150,7 +130,7 @@ type JSON struct {
 
 // Value returns this instance serialized for database storage.
 func (j JSON) Value() (driver.Value, error) {
-	s := j.Bytes()
+	s := j.String()
 	if len(s) == 0 {
 		return nil, nil
 	}
@@ -159,14 +139,12 @@ func (j JSON) Value() (driver.Value, error) {
 
 // Scan reads the database value and returns an instance.
 func (j *JSON) Scan(value interface{}) error {
-	switch v := value.(type) {
-	case string:
-		*j = JSON{Result: gjson.Parse(v)}
-	case []byte:
-		*j = JSON{Result: gjson.ParseBytes(v)}
-	default:
-		return fmt.Errorf("unable to convert %v of %T to JSON", value, value)
+	temp, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("Unable to convert %v of %T to JSON", value, value)
 	}
+
+	*j = JSON{Result: gjson.Parse(temp)}
 	return nil
 }
 
@@ -265,7 +243,7 @@ func (j JSON) CBOR() ([]byte, error) {
 		return cbor.Marshal(v)
 	default:
 		var b []byte
-		return b, fmt.Errorf("unable to coerce JSON to CBOR for type %T", v)
+		return b, fmt.Errorf("Unable to coerce JSON to CBOR for type %T", v)
 	}
 }
 
@@ -313,7 +291,7 @@ func (w WebURL) Value() (driver.Value, error) {
 func (w *WebURL) Scan(value interface{}) error {
 	s, ok := value.(string)
 	if !ok {
-		return fmt.Errorf("unable to convert %v of %T to WebURL", value, value)
+		return fmt.Errorf("Unable to convert %v of %T to WebURL", value, value)
 	}
 
 	u, err := url.ParseRequestURI(s)
@@ -409,11 +387,13 @@ func (t *AnyTime) Scan(value interface{}) error {
 		t.Valid = false
 		return nil
 	default:
-		return fmt.Errorf("unable to convert %v of %T to Time", value, value)
+		return fmt.Errorf("Unable to convert %v of %T to Time", value, value)
 	}
 }
 
 // Cron holds the string that will represent the spec of the cron-job.
+// It uses 6 fields to represent the seconds (1), minutes (2), hours (3),
+// day of the month (4), month (5), and day of the week (6).
 type Cron string
 
 // UnmarshalJSON parses the raw spec stored in JSON-encoded
@@ -428,11 +408,7 @@ func (c *Cron) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 
-	if !strings.HasPrefix(s, "CRON_TZ=") {
-		return errors.New("Cron: specs must specify a time zone using CRON_TZ, e.g. 'CRON_TZ=UTC 5 * * * *'")
-	}
-
-	_, err = CronParser.Parse(s)
+	_, err = cron.Parse(s)
 	if err != nil {
 		return fmt.Errorf("Cron: %v", err)
 	}
@@ -445,46 +421,20 @@ func (c Cron) String() string {
 	return string(c)
 }
 
-// Duration is a non-negative time duration.
-type Duration struct{ d time.Duration }
-
-func MakeDuration(d time.Duration) (Duration, error) {
-	if d < time.Duration(0) {
-		return Duration{}, fmt.Errorf("cannot make negative time duration: %s", d)
-	}
-	return Duration{d: d}, nil
-}
-
-func MustMakeDuration(d time.Duration) Duration {
-	rv, err := MakeDuration(d)
-	if err != nil {
-		panic(err)
-	}
-	return rv
-}
+// Duration is a time duration.
+type Duration time.Duration
 
 // Duration returns the value as the standard time.Duration value.
 func (d Duration) Duration() time.Duration {
-	return d.d
+	return time.Duration(d)
 }
-
-// Before returns the time d units before time t
-func (d Duration) Before(t time.Time) time.Time {
-	return t.Add(-d.Duration())
-}
-
-// Shorter returns true if and only if d is shorter than od.
-func (d Duration) Shorter(od Duration) bool { return d.d < od.d }
-
-// IsInstant is true if and only if d is of duration 0
-func (d Duration) IsInstant() bool { return d.d == 0 }
 
 // String returns a string representing the duration in the form "72h3m0.5s".
 // Leading zero units are omitted. As a special case, durations less than one
 // second format use a smaller unit (milli-, micro-, or nanoseconds) to ensure
 // that the leading digit is non-zero. The zero duration formats as 0s.
 func (d Duration) String() string {
-	return d.Duration().String()
+	return time.Duration(d).String()
 }
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -503,26 +453,8 @@ func (d *Duration) UnmarshalJSON(input []byte) error {
 	if err != nil {
 		return err
 	}
-	*d, err = MakeDuration(v)
-	if err != nil {
-		return err
-	}
+	*d = Duration(v)
 	return nil
-}
-
-func (d *Duration) Scan(v interface{}) (err error) {
-	switch tv := v.(type) {
-	case int64:
-		*d, err = MakeDuration(time.Duration(tv))
-		return err
-	default:
-		return errors.Errorf(`don't know how to parse "%s" of type %T as a `+
-			`models.Duration`, tv, tv)
-	}
-}
-
-func (d Duration) Value() (driver.Value, error) {
-	return int64(d.d), nil
 }
 
 // WithdrawalRequest request to withdraw LINK.
@@ -536,7 +468,7 @@ type WithdrawalRequest struct {
 type SendEtherRequest struct {
 	DestinationAddress common.Address `json:"address"`
 	FromAddress        common.Address `json:"from"`
-	Amount             assets.Eth     `json:"amount"`
+	Amount             *assets.Eth    `json:"amount"`
 }
 
 // CreateKeyRequest represents a request to add an ethereum key.
@@ -568,7 +500,7 @@ func (r AddressCollection) Value() (driver.Value, error) {
 func (r *AddressCollection) Scan(value interface{}) error {
 	str, ok := value.(string)
 	if !ok {
-		return fmt.Errorf("unable to convert %v of %T to AddressCollection", value, value)
+		return fmt.Errorf("Unable to convert %v of %T to AddressCollection", value, value)
 	}
 
 	if len(str) == 0 {
@@ -586,12 +518,9 @@ func (r *AddressCollection) Scan(value interface{}) error {
 
 // Configuration stores key value pairs for overriding global configuration
 type Configuration struct {
-	ID        int64  `gorm:"primary_key"`
-	Name      string `gorm:"not null;unique;index"`
-	Value     string `gorm:"not null"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt *time.Time
+	gorm.Model
+	Name  string `gorm:"not null;unique;index"`
+	Value string `gorm:"not null"`
 }
 
 // Merge returns a new map with all keys merged from right to left

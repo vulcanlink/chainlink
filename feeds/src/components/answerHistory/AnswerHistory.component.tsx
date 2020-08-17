@@ -1,7 +1,7 @@
-import { Icon } from 'antd'
-import { FeedConfig } from 'config'
 import React, { useEffect, useRef } from 'react'
+import { Icon } from 'antd'
 import HistoryGraphD3 from './HistoryGraph.d3'
+import { FeedConfig } from 'feeds'
 
 interface StateProps {
   answerHistory: any
@@ -29,12 +29,7 @@ const AnswerHistory: React.FC<Props> = ({ answerHistory, config }) => {
     <>
       <div className="answer-history">
         <div className="answer-history-header">
-          <h2>
-            {config.historyDays && config.historyDays > 1
-              ? `Last ${config.historyDays} days history chart`
-              : '24h Price history'}{' '}
-            {!answerHistory && <Icon type="loading" />}
-          </h2>
+          <h2>24h Price history {!answerHistory && <Icon type="loading" />}</h2>
         </div>
         <div className="answer-history-graph"></div>
       </div>

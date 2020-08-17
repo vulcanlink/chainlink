@@ -1,4 +1,4 @@
-import { getRepository, SelectQueryBuilder } from 'typeorm'
+import { Connection, SelectQueryBuilder } from 'typeorm'
 import { JobRun } from '../entity/JobRun'
 import { PaginationParams } from '../utils/pagination'
 
@@ -19,34 +19,30 @@ const normalizeSearchToken = (id: string): string => {
   return id
 }
 
-const buildSearchTokens = (searchQuery: string): string[] => {
-  let searchTokens = searchQuery.split(/\s+/)
-  searchTokens = searchTokens.concat(searchTokens.map(normalizeSearchToken))
-  return searchTokens
-}
+const searchBuilder = (
+  db: Connection,
+  params: SearchParams,
+): SelectQueryBuilder<JobRun> => {
+  let query = db.getRepository(JobRun).createQueryBuilder('job_run')
 
-const searchBuilder = (searchQuery?: string): SelectQueryBuilder<JobRun> => {
-  let query = getRepository(JobRun).createQueryBuilder('job_run')
-
-  if (searchQuery != null) {
-    const searchTokens = buildSearchTokens(searchQuery)
-    query = query.addSelect('COUNT(*) OVER() AS "totalRecords"').where(
-      `
-        ARRAY["job_run"."runId", "job_run"."jobId", "job_run"."requestId", "job_run"."requester", "job_run"."txHash"] && ARRAY[:...searchTokens]::citext[]
-      `,
-      { searchTokens },
-    )
+  if (params.searchQuery != null) {
+    const searchTokens = params.searchQuery.split(/\s+/)
+    const normalizedSearchTokens = searchTokens.map(normalizeSearchToken)
+    query = query
+      .where('job_run.runId IN(:...searchTokens)', { searchTokens })
+      .orWhere('job_run.jobId IN(:...searchTokens)', { searchTokens })
+      .orWhere('job_run.requester IN(:...normalizedSearchTokens)', {
+        normalizedSearchTokens,
+      })
+      .orWhere('job_run.requestId IN(:...normalizedSearchTokens)', {
+        normalizedSearchTokens,
+      })
+      .orWhere('job_run.txHash IN(:...normalizedSearchTokens)', {
+        normalizedSearchTokens,
+      })
   } else {
     query = query.where('true = false')
   }
-
-  return query
-}
-
-const pagedSearchBuilder = (
-  params: SearchParams,
-): SelectQueryBuilder<JobRun> => {
-  let query = searchBuilder(params.searchQuery)
 
   if (params.limit != null) {
     query = query.limit(params.limit)
@@ -60,25 +56,23 @@ const pagedSearchBuilder = (
   return query
 }
 
-export class JobRunSearch {
-  public results: JobRun[]
-  public totalRecords: number
-  private query: SelectQueryBuilder<JobRun>
-
-  constructor(params: SearchParams) {
-    this.query = pagedSearchBuilder(params)
-      .leftJoinAndSelect('job_run.chainlinkNode', 'chainlink_node')
-      .orderBy('job_run.createdAt', 'DESC')
-  }
-
-  async execute(): Promise<JobRunSearch> {
-    const query = await this.query.getRawAndEntities()
-    this.results = query.entities
-    this.totalRecords = parseInt(query.raw[0]?.totalRecords, 10) || 0
-    return this
-  }
+export const search = async (
+  db: Connection,
+  params: SearchParams,
+): Promise<JobRun[]> => {
+  return searchBuilder(db, params)
+    .leftJoinAndSelect('job_run.chainlinkNode', 'chainlink_node')
+    .orderBy('job_run.createdAt', 'DESC')
+    .getMany()
 }
 
-export const search = async (params: SearchParams): Promise<JobRunSearch> => {
-  return new JobRunSearch(params).execute()
+export const count = async (
+  db: Connection,
+  params: SearchParams,
+): Promise<number> => {
+  const result = await searchBuilder(db, params)
+    .select('COUNT(*)', 'count')
+    .getRawOne()
+
+  return parseInt(result['count'], 10)
 }

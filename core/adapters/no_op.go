@@ -1,8 +1,8 @@
 package adapters
 
 import (
-	"github.com/smartcontractkit/chainlink/core/store"
-	"github.com/smartcontractkit/chainlink/core/store/models"
+	"chainlink/core/store"
+	"chainlink/core/store/models"
 )
 
 // NoOp adapter type holds no fields
@@ -19,16 +19,16 @@ func (noa *NoOp) Perform(input models.RunInput, _ *store.Store) models.RunOutput
 	return models.NewRunOutputCompleteWithResult(val)
 }
 
-// NoOpPendOutgoing adapter type holds no fields
-type NoOpPendOutgoing struct{}
+// NoOpPend adapter type holds no fields
+type NoOpPend struct{}
 
 // TaskType returns the type of Adapter.
-func (noa *NoOpPendOutgoing) TaskType() models.TaskType {
-	return TaskTypeNoOpPendOutgoing
+func (noa *NoOpPend) TaskType() models.TaskType {
+	return TaskTypeNoOpPend
 }
 
 // Perform on this adapter type returns an empty RunResult with an
 // added field for the status to indicate the task is Pending.
-func (noa *NoOpPendOutgoing) Perform(_ models.RunInput, _ *store.Store) models.RunOutput {
-	return models.NewRunOutputPendingOutgoingConfirmationsWithData(models.JSON{})
+func (noa *NoOpPend) Perform(_ models.RunInput, _ *store.Store) models.RunOutput {
+	return models.NewRunOutputPendingConfirmationsWithData(models.JSON{})
 }

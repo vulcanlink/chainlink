@@ -9,9 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/store"
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"chainlink/core/logger"
+	"chainlink/core/utils"
 
 	"github.com/gorilla/websocket"
 )
@@ -65,11 +64,6 @@ type websocketClient struct {
 	url       *url.URL
 	accessKey string
 	secret    string
-
-	closeRequested chan struct{}
-	closed         chan struct{}
-
-	statusMtx sync.RWMutex
 }
 
 // NewWebSocketClient returns a stats pusher using a websocket for
@@ -84,9 +78,6 @@ func NewWebSocketClient(url *url.URL, accessKey, secret string) WebSocketClient 
 		status:    ConnectionStatusDisconnected,
 		accessKey: accessKey,
 		secret:    secret,
-
-		closeRequested: make(chan struct{}),
-		closed:         make(chan struct{}),
 	}
 }
 
@@ -97,8 +88,6 @@ func (w *websocketClient) Url() url.URL {
 
 // Status returns the current connection status
 func (w *websocketClient) Status() ConnectionStatus {
-	w.statusMtx.RLock()
-	defer w.statusMtx.RUnlock()
 	return w.status
 }
 
@@ -180,7 +169,7 @@ func (w *websocketClient) connectAndWritePump(parentCtx context.Context, wg *syn
 			defer cancel()
 
 			if err := w.connect(connectionCtx); err != nil {
-				w.setStatus(ConnectionStatusError)
+				w.status = ConnectionStatusError
 				if !doneWaiting {
 					wg.Done()
 				}
@@ -188,8 +177,7 @@ func (w *websocketClient) connectAndWritePump(parentCtx context.Context, wg *syn
 				break
 			}
 
-			w.setStatus(ConnectionStatusConnected)
-
+			w.status = ConnectionStatusConnected
 			if !doneWaiting {
 				wg.Done()
 			}
@@ -201,12 +189,6 @@ func (w *websocketClient) connectAndWritePump(parentCtx context.Context, wg *syn
 
 		doneWaiting = true
 	}
-}
-
-func (w *websocketClient) setStatus(s ConnectionStatus) {
-	w.statusMtx.Lock()
-	defer w.statusMtx.Unlock()
-	w.status = s
 }
 
 // Inspired by https://github.com/gorilla/websocket/blob/master/examples/chat/client.go#L82
@@ -256,10 +238,8 @@ func (w *websocketClient) writeMessage(message []byte) error {
 
 func (w *websocketClient) connect(ctx context.Context) error {
 	authHeader := http.Header{}
-	authHeader.Add("X-Explore-Chainlink-Accesskey", w.accessKey)
+	authHeader.Add("X-Explore-Chainlink-AccessKey", w.accessKey)
 	authHeader.Add("X-Explore-Chainlink-Secret", w.secret)
-	authHeader.Add("X-Explore-Chainlink-Core-Version", store.Version)
-	authHeader.Add("X-Explore-Chainlink-Core-Sha", store.Sha)
 
 	conn, _, err := websocket.DefaultDialer.DialContext(ctx, w.url.String(), authHeader)
 	if err != nil {
@@ -271,8 +251,6 @@ func (w *websocketClient) connect(ctx context.Context) error {
 }
 
 var expectedCloseMessages = []int{websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure}
-
-const CloseTimeout = 100 * time.Millisecond
 
 // readPump listens on the websocket connection for control messages and
 // response messages (text)
@@ -296,12 +274,6 @@ func (w *websocketClient) readPump(cancel context.CancelFunc) {
 			if websocket.IsUnexpectedCloseError(err, expectedCloseMessages...) {
 				logger.Warn(fmt.Sprintf("readPump: %v", err))
 			}
-			select {
-			case <-w.closeRequested:
-				w.closed <- struct{}{}
-			case <-time.After(CloseTimeout):
-				logger.Warn("websocket readPump failed to notify closer")
-			}
 			return
 		}
 
@@ -314,7 +286,7 @@ func (w *websocketClient) readPump(cancel context.CancelFunc) {
 
 func (w *websocketClient) wrapConnErrorIf(err error) {
 	if err != nil && websocket.IsUnexpectedCloseError(err, expectedCloseMessages...) {
-		w.setStatus(ConnectionStatusError)
+		w.status = ConnectionStatusError
 		logger.Error(fmt.Sprintf("websocketStatsPusher: %v", err))
 	}
 }
@@ -327,11 +299,5 @@ func (w *websocketClient) Close() error {
 		w.cancel()
 	}
 	w.started = false
-	select {
-	case w.closeRequested <- struct{}{}:
-		<-w.closed
-	case <-time.After(CloseTimeout):
-		logger.Warn("websocketClient.Close failed to be notified from readPump")
-	}
 	return nil
 }

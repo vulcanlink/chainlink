@@ -1,184 +1,208 @@
-import { FeedConfig, OracleNode } from 'config'
-import {
-  CLEAR_STATE,
-  FETCH_FEED_BY_PAIR_BEGIN,
-  FETCH_FEED_BY_PAIR_SUCCESS,
-  FETCH_FEED_BY_PAIR_ERROR,
-  FETCH_FEED_BY_ADDRESS_BEGIN,
-  FETCH_FEED_BY_ADDRESS_SUCCESS,
-  FETCH_FEED_BY_ADDRESS_ERROR,
-  FETCH_ORACLE_NODES_BEGIN,
-  FETCH_ORACLE_NODES_SUCCESS,
-  FETCH_ORACLE_NODES_ERROR,
-  ORACLE_LIST,
-  LATEST_ANSWER,
-  LATEST_COMPLETED_ANSWER_ID,
-  PENDING_ANSWER_ID,
-  NEXT_ANSWER_ID,
-  ORACLE_ANSWERS,
-  LATEST_REQUEST_TIMESTAMP,
-  MINIMUM_ANSWERS,
-  LATEST_ANSWER_TIMESTAMP,
-  ANSWER_HISTORY,
-  CONTRACT_ADDRESS,
-  ETHGAS_PRICE,
-  AggregatorActionTypes,
-} from './types'
-
-export function clearState(): AggregatorActionTypes {
-  return {
-    type: CLEAR_STATE,
-  }
+/**
+ * aggregator/ORACLE_LIST
+ */
+export interface SetOracleListAction {
+  type: 'aggregator/ORACLE_LIST'
+  payload: any
 }
 
-export function fetchFeedByPairBegin(): AggregatorActionTypes {
+export function setOracleList(payload: Array<string>) {
   return {
-    type: FETCH_FEED_BY_PAIR_BEGIN,
-  }
-}
-
-export function fetchFeedByPairSuccess(
-  payload: FeedConfig,
-): AggregatorActionTypes {
-  return {
-    type: FETCH_FEED_BY_PAIR_SUCCESS,
+    type: 'aggregator/ORACLE_LIST',
     payload,
   }
 }
 
-export function fetchFeedByPairError(error: string): AggregatorActionTypes {
-  return {
-    type: FETCH_FEED_BY_PAIR_ERROR,
-    error,
-  }
+/**
+ * aggregator/LATEST_ANSWER
+ */
+export interface SetLatestAnswerAction {
+  type: 'aggregator/LATEST_ANSWER'
+  payload: any
 }
 
-export function fetchFeedByAddressBegin(): AggregatorActionTypes {
+export function setLatestAnswer(payload: any) {
   return {
-    type: FETCH_FEED_BY_ADDRESS_BEGIN,
-  }
-}
-
-export function fetchFeedByAddressSuccess(
-  payload: FeedConfig,
-): AggregatorActionTypes {
-  return {
-    type: FETCH_FEED_BY_ADDRESS_SUCCESS,
+    type: 'aggregator/LATEST_ANSWER',
     payload,
   }
 }
 
-export function fetchFeedByAddressError(error: string): AggregatorActionTypes {
-  return {
-    type: FETCH_FEED_BY_ADDRESS_ERROR,
-    error,
-  }
+/**
+ * aggregator/LATEST_COMPLETED_ANSWER_ID
+ */
+export interface SetLatestCompletedAnswerIdAction {
+  type: 'aggregator/LATEST_COMPLETED_ANSWER_ID'
+  payload: any
 }
 
-export function fetchOracleNodesBegin(): AggregatorActionTypes {
+export function setLatestCompletedAnswerId(payload: any) {
   return {
-    type: FETCH_ORACLE_NODES_BEGIN,
-  }
-}
-
-export function fetchOracleNodesSuccess(
-  payload: OracleNode[],
-): AggregatorActionTypes {
-  return {
-    type: FETCH_ORACLE_NODES_SUCCESS,
+    type: 'aggregator/LATEST_COMPLETED_ANSWER_ID',
     payload,
   }
 }
 
-export function fetchOracleNodesError(error: string): AggregatorActionTypes {
-  return {
-    type: FETCH_ORACLE_NODES_ERROR,
-    error,
-  }
+/**
+ * aggregator/PENDING_ANSWER_ID
+ */
+export interface SetPendingAnswerIdAction {
+  type: 'aggregator/PENDING_ANSWER_ID'
+  payload: any
 }
 
-export function setOracleList(payload: Array<string>): AggregatorActionTypes {
+export function setPendingAnswerId(payload: any) {
   return {
-    type: ORACLE_LIST,
+    type: 'aggregator/PENDING_ANSWER_ID',
     payload,
   }
 }
 
-export function setLatestAnswer(payload: any): AggregatorActionTypes {
+/**
+ * aggregator/NEXT_ANSWER_ID
+ */
+export interface SetNextAnswerIdAction {
+  type: 'aggregator/NEXT_ANSWER_ID'
+  payload: any
+}
+
+export function setNextAnswerId(payload: any) {
   return {
-    type: LATEST_ANSWER,
+    type: 'aggregator/NEXT_ANSWER_ID',
     payload,
   }
 }
 
-export function setLatestCompletedAnswerId(
-  payload: any,
-): AggregatorActionTypes {
+/**
+ * aggregator/ORACLE_ANSWERS
+ */
+export interface SetOracleAnswersAction {
+  type: 'aggregator/ORACLE_ANSWERS'
+  payload: any
+}
+
+export function setOracleAnswers(payload: any) {
   return {
-    type: LATEST_COMPLETED_ANSWER_ID,
+    type: 'aggregator/ORACLE_ANSWERS',
     payload,
   }
 }
 
-export function setPendingAnswerId(payload: any): AggregatorActionTypes {
+/**
+ * aggregator/LATEST_REQUEST_TIMESTAMP
+ */
+export interface SetLatestRequestTimestampAction {
+  type: 'aggregator/LATEST_REQUEST_TIMESTAMP'
+  payload: any
+}
+
+export function setLatestRequestTimestamp(payload: any) {
   return {
-    type: PENDING_ANSWER_ID,
+    type: 'aggregator/LATEST_REQUEST_TIMESTAMP',
     payload,
   }
 }
 
-export function setNextAnswerId(payload: any): AggregatorActionTypes {
+/**
+ * aggregator/MINIMUM_ANSWERS
+ */
+export interface SetMinimumAnswersAction {
+  type: 'aggregator/MINIMUM_ANSWERS'
+  payload: any
+}
+
+export function setMinumumAnswers(payload: any) {
   return {
-    type: NEXT_ANSWER_ID,
+    type: 'aggregator/MINIMUM_ANSWERS',
     payload,
   }
 }
 
-export function setOracleAnswers(payload: any): AggregatorActionTypes {
+/**
+ * aggregator/LATEST_ANSWER_TIMESTAMP
+ */
+export interface SetLatestAnswerTimestampAction {
+  type: 'aggregator/LATEST_ANSWER_TIMESTAMP'
+  payload: any
+}
+
+export function setLatestAnswerTimestamp(payload: any) {
   return {
-    type: ORACLE_ANSWERS,
+    type: 'aggregator/LATEST_ANSWER_TIMESTAMP',
     payload,
   }
 }
 
-export function setLatestRequestTimestamp(payload: any): AggregatorActionTypes {
+/**
+ * aggregator/ANSWER_HISTORY
+ */
+export interface SetAnswersHistoryAction {
+  type: 'aggregator/ANSWER_HISTORY'
+  payload: any
+}
+
+export function setAnswerHistory(payload: any) {
   return {
-    type: LATEST_REQUEST_TIMESTAMP,
+    type: 'aggregator/ANSWER_HISTORY',
     payload,
   }
 }
 
-export function setMinumumAnswers(payload: any): AggregatorActionTypes {
+/**
+ * aggregator/CONTRACT_ADDRESS
+ */
+export interface SetCurrentAddressAction {
+  type: 'aggregator/CONTRACT_ADDRESS'
+  payload: any
+}
+
+export function setContractAddress(payload: any) {
   return {
-    type: MINIMUM_ANSWERS,
+    type: 'aggregator/CONTRACT_ADDRESS',
     payload,
   }
 }
 
-export function setLatestAnswerTimestamp(payload: any): AggregatorActionTypes {
+/**
+ * aggregator/CONFIG
+ */
+export interface SetConfigAction {
+  type: 'aggregator/CONFIG'
+  payload: any
+}
+
+export function setConfig(payload: any) {
   return {
-    type: LATEST_ANSWER_TIMESTAMP,
+    type: 'aggregator/CONFIG',
     payload,
   }
 }
 
-export function setAnswerHistory(payload: any): AggregatorActionTypes {
+/**
+ * aggregator/CLEAR_STATE
+ */
+export interface SetClearStateAction {
+  type: 'aggregator/CLEAR_STATE'
+  payload: any
+}
+
+export function clearState() {
   return {
-    type: ANSWER_HISTORY,
-    payload,
+    type: 'aggregator/CLEAR_STATE',
   }
 }
 
-export function setContractAddress(payload: any): AggregatorActionTypes {
-  return {
-    type: CONTRACT_ADDRESS,
-    payload,
-  }
+/**
+ * aggregator/ETHGAS_PRICE
+ */
+export interface SetEthGasPriceAction {
+  type: 'aggregator/ETHGAS_PRICE'
+  payload: any
 }
 
-export function setEthGasPrice(payload: any): AggregatorActionTypes {
+export function setEthGasPrice(payload: any) {
   return {
-    type: ETHGAS_PRICE,
+    type: 'aggregator/ETHGAS_PRICE',
     payload,
   }
 }

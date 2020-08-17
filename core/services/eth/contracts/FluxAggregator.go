@@ -3,17 +3,18 @@ package contracts
 import (
 	"math/big"
 
-	"github.com/smartcontractkit/chainlink/core/services/eth"
+	"chainlink/core/eth"
+	ethsvc "chainlink/core/services/eth"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 )
 
-//go:generate mockery --name FluxAggregator --output ../../../internal/mocks/ --case=underscore
+//go:generate mockery -name FluxAggregator -output ../../../internal/mocks/ -case=underscore
 
 type FluxAggregator interface {
-	eth.ConnectedContract
-	RoundState(oracle common.Address, roundID uint32) (FluxAggregatorRoundState, error)
+	ethsvc.ConnectedContract
+	RoundState(oracle common.Address) (FluxAggregatorRoundState, error)
 }
 
 const (
@@ -32,64 +33,57 @@ var (
 )
 
 type fluxAggregator struct {
-	eth.ConnectedContract
+	ethsvc.ConnectedContract
 	ethClient eth.Client
 	address   common.Address
 }
 
 type LogNewRound struct {
-	eth.GethRawLog
+	eth.Log
 	RoundId   *big.Int
 	StartedBy common.Address
-	// seconds since unix epoch
 	StartedAt *big.Int
 }
 
 type LogAnswerUpdated struct {
-	eth.GethRawLog
+	eth.Log
 	Current   *big.Int
 	RoundId   *big.Int
-	UpdatedAt *big.Int
+	Timestamp *big.Int
 }
 
-var fluxAggregatorLogTypes = map[common.Hash]eth.Log{
-	AggregatorNewRoundLogTopic20191220:      &LogNewRound{},
-	AggregatorAnswerUpdatedLogTopic20191220: &LogAnswerUpdated{},
+var fluxAggregatorLogTypes = map[common.Hash]interface{}{
+	AggregatorNewRoundLogTopic20191220:      LogNewRound{},
+	AggregatorAnswerUpdatedLogTopic20191220: LogAnswerUpdated{},
 }
 
-func NewFluxAggregator(address common.Address, ethClient eth.Client, logBroadcaster eth.LogBroadcaster) (FluxAggregator, error) {
+func NewFluxAggregator(address common.Address, ethClient eth.Client, logBroadcaster ethsvc.LogBroadcaster) (FluxAggregator, error) {
 	codec, err := eth.GetV6ContractCodec(FluxAggregatorName)
 	if err != nil {
 		return nil, err
 	}
-	connectedContract := eth.NewConnectedContract(codec, address, ethClient, logBroadcaster)
+	connectedContract := ethsvc.NewConnectedContract(codec, address, ethClient, logBroadcaster)
 	return &fluxAggregator{connectedContract, ethClient, address}, nil
 }
 
-func (fa *fluxAggregator) SubscribeToLogs(listener eth.LogListener) (connected bool, _ eth.UnsubscribeFunc) {
+func (fa *fluxAggregator) SubscribeToLogs(listener ethsvc.LogListener) (connected bool, _ ethsvc.UnsubscribeFunc) {
 	return fa.ConnectedContract.SubscribeToLogs(
-		eth.NewDecodingLogListener(fa, fluxAggregatorLogTypes, listener),
+		ethsvc.NewDecodingLogListener(fa, fluxAggregatorLogTypes, listener),
 	)
 }
 
 type FluxAggregatorRoundState struct {
-	ReportableRoundID uint32   `abi:"_roundId"`
+	ReportableRoundID uint32   `abi:"_reportableRoundId"`
 	EligibleToSubmit  bool     `abi:"_eligibleToSubmit"`
-	LatestAnswer      *big.Int `abi:"_latestSubmission"`
-	Timeout           uint64   `abi:"_timeout"`
-	StartedAt         uint64   `abi:"_startedAt"`
+	LatestAnswer      *big.Int `abi:"_latestRoundAnswer"`
+	TimesOutAt        uint64   `abi:"_timesOutAt"`
 	AvailableFunds    *big.Int `abi:"_availableFunds"`
 	PaymentAmount     *big.Int `abi:"_paymentAmount"`
-	OracleCount       uint8    `abi:"_oracleCount"`
 }
 
-func (rs FluxAggregatorRoundState) TimesOutAt() uint64 {
-	return rs.StartedAt + rs.Timeout
-}
-
-func (fa *fluxAggregator) RoundState(oracle common.Address, roundID uint32) (FluxAggregatorRoundState, error) {
+func (fa *fluxAggregator) RoundState(oracle common.Address) (FluxAggregatorRoundState, error) {
 	var result FluxAggregatorRoundState
-	err := fa.Call(&result, "oracleRoundState", oracle, roundID)
+	err := fa.Call(&result, "roundState", oracle)
 	if err != nil {
 		return FluxAggregatorRoundState{}, errors.Wrap(err, "unable to encode message call")
 	}

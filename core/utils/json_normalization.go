@@ -8,8 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/smartcontractkit/chainlink/core/logger"
-
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -24,8 +22,7 @@ import (
 func NormalizedJSON(val []byte) (string, error) {
 	// Unmarshal into a generic interface{}
 	var data interface{}
-	var err error
-	if err = json.Unmarshal(val, &data); err != nil {
+	if err := json.Unmarshal(val, &data); err != nil {
 		return "", err
 	}
 
@@ -34,18 +31,14 @@ func NormalizedJSON(val []byte) (string, error) {
 
 	// Wrap the buffer in a normalization writer
 	wc := norm.NFC.Writer(writer)
-	defer logger.ErrorIfCalling(wc.Close)
+	defer wc.Close()
 
 	// Now marshal the generic interface
-	if err = marshal(wc, data); err != nil {
+	if err := marshal(wc, data); err != nil {
 		return "", err
 	}
-	if err = wc.Close(); err != nil {
-		return "", err
-	}
-	if err = writer.Flush(); err != nil {
-		return "", err
-	}
+	wc.Close()
+	writer.Flush()
 	return buffer.String(), nil
 }
 
@@ -131,18 +124,18 @@ func marshalArray(writer io.Writer, data []interface{}) error {
 	}
 
 	for index, item := range data {
-		marErr := marshal(writer, item)
-		if marErr != nil {
-			return marErr
+		err := marshal(writer, item)
+		if err != nil {
+			return err
 		}
 
 		if index == len(data)-1 {
 			break
 		}
 
-		_, fmtErr := fmt.Fprintf(writer, ",")
-		if fmtErr != nil {
-			return fmtErr
+		_, err = fmt.Fprintf(writer, ",")
+		if err != nil {
+			return err
 		}
 	}
 

@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	strpkg "github.com/smartcontractkit/chainlink/core/store"
-	"github.com/smartcontractkit/chainlink/core/store/models/vrfkey"
+	strpkg "chainlink/core/store"
+	"chainlink/core/store/models/vrfkey"
 )
 
 // StoredVRFKey creates a VRFKeyStore on store, imports a known VRF key into it,

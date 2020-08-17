@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/core/services/signatures/cryptotest"
-	"github.com/smartcontractkit/chainlink/core/services/signatures/ethschnorr"
-	"github.com/smartcontractkit/chainlink/core/services/signatures/secp256k1"
+	"chainlink/core/services/signatures/cryptotest"
+	"chainlink/core/services/signatures/ethschnorr"
+	"chainlink/core/services/signatures/secp256k1"
 
 	"go.dedis.ch/kyber/v3"
 	dkg "go.dedis.ch/kyber/v3/share/dkg/rabin"
@@ -27,6 +27,8 @@ var partSec []kyber.Scalar
 
 var longterms []*dkg.DistKeyShare
 var randoms []*dkg.DistKeyShare
+
+var dss []*DSS
 
 var msg *big.Int
 
@@ -128,8 +130,8 @@ func TestDSSPartialSigs(t *testing.T) {
 	// enough partial sigs ?
 	for i := 2; i < nbParticipants; i++ {
 		dss := getDSS(i)
-		ps, e := dss.PartialSig()
-		require.Nil(t, e)
+		ps, err := dss.PartialSig()
+		require.Nil(t, err)
 		require.Nil(t, dss1.ProcessPartialSig(ps))
 	}
 	assert.True(t, dss1.EnoughPartialSig())

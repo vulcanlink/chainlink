@@ -7,8 +7,6 @@ export interface OperatorShowData {
   url?: string
   createdAt: string
   uptime: number
-  coreVersion?: string
-  coreSha?: string
   jobCounts: {
     completed: number
     errored: number

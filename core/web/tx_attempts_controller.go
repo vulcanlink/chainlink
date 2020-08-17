@@ -1,7 +1,7 @@
 package web
 
 import (
-	"github.com/smartcontractkit/chainlink/core/services/chainlink"
+	"chainlink/core/services/chainlink"
 
 	"github.com/gin-gonic/gin"
 )

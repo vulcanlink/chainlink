@@ -1,75 +1,66 @@
-import { DispatchBinding } from '@chainlink/ts-helpers'
-import { Row } from 'antd'
 import React, { useEffect } from 'react'
-import { connect, MapDispatchToProps, MapStateToProps } from 'react-redux'
+import { connect } from 'react-redux'
+import { Row } from 'antd'
 import { AppState } from 'state'
 import { listingOperations, listingSelectors } from '../../state/ducks/listing'
 import GridItem from './GridItem'
+import { ListingGroup } from 'state/ducks/listing/selectors'
 
-interface OwnProps {
-  enableDetails: boolean
+interface Props {
+  groups: ListingGroup[]
+  fetchAnswers: any
+  fetchHealthStatus: any
+  enableHealth: boolean
+  compareOffchain: boolean
 }
-
-interface StateProps {
-  loadingFeeds: boolean
-  feedGroups: listingSelectors.ListingGroup[]
-}
-
-interface DispatchProps {
-  fetchFeeds: DispatchBinding<typeof listingOperations.fetchFeeds>
-}
-
-interface Props extends OwnProps, StateProps, DispatchProps {}
 
 export const Listing: React.FC<Props> = ({
-  fetchFeeds,
-  loadingFeeds,
-  feedGroups,
-  enableDetails,
+  fetchAnswers,
+  fetchHealthStatus,
+  groups,
+  compareOffchain,
+  enableHealth,
 }) => {
   useEffect(() => {
-    fetchFeeds()
-  }, [fetchFeeds])
+    fetchAnswers()
+  }, [fetchAnswers])
+  useEffect(() => {
+    if (enableHealth) {
+      fetchHealthStatus(groups)
+    }
+  }, [enableHealth, fetchHealthStatus, groups])
 
-  let content
-  if (loadingFeeds) {
-    content = <>Loading Feeds...</>
-  } else {
-    content = (
-      <div className="listing">
-        {feedGroups.map(g => (
-          <div className="listing-grid__group" key={g.name}>
-            <h3 className="listing-grid__header">
-              Decentralized Price Reference Data for {g.name} Pairs
-            </h3>
+  return (
+    <div className="listing">
+      {groups.map(group => (
+        <div className="listing-grid__group" key={group.name}>
+          <h3 className="listing-grid__header">
+            Decentralized Price Reference Data for {group.name} Pairs
+          </h3>
 
-            <Row gutter={18} className="listing-grid">
-              {g.feeds.map(f => (
-                <GridItem key={f.name} feed={f} enableDetails={enableDetails} />
-              ))}
-            </Row>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  return content
+          <Row gutter={18} className="listing-grid">
+            {group.feeds.map(f => (
+              <GridItem
+                key={f.name}
+                feed={f}
+                compareOffchain={compareOffchain}
+                enableHealth={enableHealth}
+              />
+            ))}
+          </Row>
+        </div>
+      ))}
+    </div>
+  )
 }
 
-const mapStateToProps: MapStateToProps<
-  StateProps,
-  OwnProps,
-  AppState
-> = state => {
-  return {
-    loadingFeeds: state.listing.loadingFeeds,
-    feedGroups: listingSelectors.feedGroups(state),
-  }
-}
+const mapStateToProps = (state: AppState) => ({
+  groups: listingSelectors.groups(state),
+})
 
-const mapDispatchToProps: MapDispatchToProps<DispatchProps, OwnProps> = {
-  fetchFeeds: listingOperations.fetchFeeds,
+const mapDispatchToProps = {
+  fetchAnswers: listingOperations.fetchAnswers,
+  fetchHealthStatus: listingOperations.fetchHealthStatus,
 }
 
 export default connect(mapStateToProps, mapDispatchToProps)(Listing)

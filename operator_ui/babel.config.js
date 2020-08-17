@@ -1,14 +1,8 @@
 module.exports = {
+  extends: 'react-static/.babelrc',
   presets: [
     '@babel/preset-react',
-    [
-      '@babel/preset-env',
-      {
-        targets: {
-          esmodules: true,
-        },
-      },
-    ],
+    '@babel/preset-env',
     '@babel/preset-typescript',
   ],
   plugins: [

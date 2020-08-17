@@ -1,7 +1,7 @@
 package adapters
 
 import (
-	"github.com/smartcontractkit/chainlink/core/store/models"
+	"chainlink/core/store/models"
 
 	"github.com/shopspring/decimal"
 )

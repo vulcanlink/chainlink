@@ -1,23 +1,20 @@
 package chainlink
 
 import (
-	"context"
-	stderr "errors"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
-	"github.com/smartcontractkit/chainlink/core/gracefulpanic"
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/services"
-	"github.com/smartcontractkit/chainlink/core/services/bulletprooftxmanager"
-	"github.com/smartcontractkit/chainlink/core/services/eth"
-	"github.com/smartcontractkit/chainlink/core/services/fluxmonitor"
-	"github.com/smartcontractkit/chainlink/core/services/synchronization"
-	strpkg "github.com/smartcontractkit/chainlink/core/store"
-	"github.com/smartcontractkit/chainlink/core/store/models"
-	"github.com/smartcontractkit/chainlink/core/store/orm"
+	"chainlink/core/gracefulpanic"
+	"chainlink/core/logger"
+	"chainlink/core/services"
+	"chainlink/core/services/fluxmonitor"
+	"chainlink/core/services/synchronization"
+	"chainlink/core/store"
+	strpkg "chainlink/core/store"
+	"chainlink/core/store/models"
+	"chainlink/core/store/orm"
 
 	"github.com/gobuffalo/packr"
 	"go.uber.org/multierr"
@@ -33,16 +30,16 @@ func (c *headTrackableCallback) Connect(*models.Head) error {
 	return nil
 }
 
-func (c *headTrackableCallback) Disconnect()                   {}
-func (c *headTrackableCallback) OnNewLongestChain(models.Head) {}
+func (c *headTrackableCallback) Disconnect()            {}
+func (c *headTrackableCallback) OnNewHead(*models.Head) {}
 
-//go:generate mockery --name Application --output ../internal/mocks/ --case=underscore
+//go:generate mockery -name Application -output ../internal/mocks/ -case=underscore
 
 // Application implements the common functions used in the core node.
 type Application interface {
 	Start() error
 	Stop() error
-	GetStore() *strpkg.Store
+	GetStore() *store.Store
 	GetStatsPusher() synchronization.StatsPusher
 	WakeSessionReaper()
 	AddJob(job models.JobSpec) error
@@ -63,11 +60,9 @@ type ChainlinkApplication struct {
 	RunQueue                 services.RunQueue
 	JobSubscriber            services.JobSubscriber
 	GasUpdater               services.GasUpdater
-	EthBroadcaster           bulletprooftxmanager.EthBroadcaster
-	LogBroadcaster           eth.LogBroadcaster
 	FluxMonitor              fluxmonitor.Service
 	Scheduler                *services.Scheduler
-	Store                    *strpkg.Store
+	Store                    *store.Store
 	SessionReaper            services.SleeperTask
 	pendingConnectionResumer *pendingConnectionResumer
 	shutdownOnce             sync.Once
@@ -80,7 +75,7 @@ type ChainlinkApplication struct {
 // be used by the node.
 func NewApplication(config *orm.Config, onConnectCallbacks ...func(Application)) Application {
 	shutdownSignal := gracefulpanic.NewSignal()
-	store := strpkg.NewStore(config, shutdownSignal)
+	store := store.NewStore(config, shutdownSignal)
 	config.SetRuntimeStore(store.ORM)
 
 	statsPusher := synchronization.NewStatsPusher(
@@ -91,21 +86,13 @@ func NewApplication(config *orm.Config, onConnectCallbacks ...func(Application))
 	runManager := services.NewRunManager(runQueue, config, store.ORM, statsPusher, store.TxManager, store.Clock)
 	jobSubscriber := services.NewJobSubscriber(store, runManager)
 	gasUpdater := services.NewGasUpdater(store)
-	logBroadcaster := eth.NewLogBroadcaster(store.TxManager, store.ORM, store.Config.BlockBackfillDepth())
-	fluxMonitor := fluxmonitor.New(store, runManager, logBroadcaster)
-	ethBroadcaster := bulletprooftxmanager.NewEthBroadcaster(store, config)
-	ethConfirmer := bulletprooftxmanager.NewEthConfirmer(store, config)
-	balanceMonitor := services.NewBalanceMonitor(store)
-
-	store.NotifyNewEthTx = ethBroadcaster
+	fluxMonitor := fluxmonitor.New(store, runManager)
 
 	pendingConnectionResumer := newPendingConnectionResumer(runManager)
 
 	app := &ChainlinkApplication{
 		JobSubscriber:            jobSubscriber,
 		GasUpdater:               gasUpdater,
-		EthBroadcaster:           ethBroadcaster,
-		LogBroadcaster:           logBroadcaster,
 		FluxMonitor:              fluxMonitor,
 		StatsPusher:              statsPusher,
 		RunManager:               runManager,
@@ -118,21 +105,12 @@ func NewApplication(config *orm.Config, onConnectCallbacks ...func(Application))
 		shutdownSignal:           shutdownSignal,
 	}
 
-	headTrackables := []strpkg.HeadTrackable{gasUpdater}
-
-	if store.Config.EnableBulletproofTxManager() {
-		headTrackables = append(headTrackables, ethConfirmer)
-	} else {
-		headTrackables = append(headTrackables, store.TxManager)
-	}
-
-	headTrackables = append(
-		headTrackables,
+	headTrackables := []strpkg.HeadTrackable{
+		gasUpdater,
+		store.TxManager,
 		jobSubscriber,
 		pendingConnectionResumer,
-		balanceMonitor,
-	)
-
+	}
 	for _, onConnectCallback := range onConnectCallbacks {
 		headTrackable := &headTrackableCallback{func() {
 			onConnectCallback(app)
@@ -144,9 +122,11 @@ func NewApplication(config *orm.Config, onConnectCallbacks ...func(Application))
 	return app
 }
 
-// Start all necessary services. If successful, nil will be returned.  Also
-// listens for interrupt signals from the operating system so that the
-// application can be properly closed before the application exits.
+// Start runs the JobSubscriber and Scheduler. If successful,
+// nil will be returned.
+// Also listens for interrupt signals from the operating system so
+// that the application can be properly closed before the application
+// exits.
 func (app *ChainlinkApplication) Start() error {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -159,21 +139,13 @@ func (app *ChainlinkApplication) Start() error {
 		app.Exiter(0)
 	}()
 
-	err := app.Store.EthClient.Dial(context.TODO())
-	if err != nil {
-		return err
-	}
-
 	// XXX: Change to exit on first encountered error.
 	return multierr.Combine(
-		err,
 		app.Store.Start(),
 		app.StatsPusher.Start(),
 		app.RunQueue.Start(),
 		app.RunManager.ResumeAllInProgress(),
-		app.LogBroadcaster.Start(),
 		app.FluxMonitor.Start(),
-		app.EthBroadcaster.Start(),
 
 		// HeadTracker deliberately started after
 		// RunManager.ResumeAllInProgress since it Connects JobSubscriber
@@ -190,24 +162,15 @@ func (app *ChainlinkApplication) Start() error {
 func (app *ChainlinkApplication) Stop() error {
 	var merr error
 	app.shutdownOnce.Do(func() {
-		defer func() {
-			if err := logger.Sync(); err != nil {
-				if stderr.Unwrap(err).Error() != os.ErrInvalid.Error() &&
-					stderr.Unwrap(err).Error() != "inappropriate ioctl for device" &&
-					stderr.Unwrap(err).Error() != "bad file descriptor" {
-					merr = multierr.Append(merr, err)
-				}
-			}
-		}()
+		defer logger.Sync()
 		logger.Info("Gracefully exiting...")
 
 		app.Scheduler.Stop()
 		merr = multierr.Append(merr, app.HeadTracker.Stop())
-		merr = multierr.Append(merr, app.JobSubscriber.Stop())
+		app.JobSubscriber.Stop()
 		app.FluxMonitor.Stop()
-		merr = multierr.Append(merr, app.EthBroadcaster.Stop())
 		app.RunQueue.Stop()
-		merr = multierr.Append(merr, app.StatsPusher.Close())
+		app.StatsPusher.Close()
 		merr = multierr.Append(merr, app.SessionReaper.Stop())
 		merr = multierr.Append(merr, app.Store.Close())
 	})
@@ -215,7 +178,7 @@ func (app *ChainlinkApplication) Stop() error {
 }
 
 // GetStore returns the pointer to the store for the ChainlinkApplication.
-func (app *ChainlinkApplication) GetStore() *strpkg.Store {
+func (app *ChainlinkApplication) GetStore() *store.Store {
 	return app.Store
 }
 
@@ -239,6 +202,9 @@ func (app *ChainlinkApplication) AddJob(job models.JobSpec) error {
 
 	app.Scheduler.AddJob(job)
 
+	// XXX: Add mechanism to asynchronously communicate when a job spec has
+	// an ethereum interaction error.
+	// https://www.pivotaltracker.com/story/show/170349568
 	logger.ErrorIf(app.FluxMonitor.AddJob(job))
 	logger.ErrorIf(app.JobSubscriber.AddJob(job, nil))
 	return nil
@@ -284,8 +250,8 @@ func newPendingConnectionResumer(runManager services.RunManager) *pendingConnect
 }
 
 func (p *pendingConnectionResumer) Connect(head *models.Head) error {
-	return p.runManager.ResumeAllPendingConnection()
+	return p.runManager.ResumeAllConnecting()
 }
 
-func (p *pendingConnectionResumer) Disconnect()                   {}
-func (p *pendingConnectionResumer) OnNewLongestChain(models.Head) {}
+func (p *pendingConnectionResumer) Disconnect()            {}
+func (p *pendingConnectionResumer) OnNewHead(*models.Head) {}
