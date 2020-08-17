@@ -58,26 +58,6 @@ const list: Node[] = [
     src: linkpool,
   },
   {
-    name: 'Certus one',
-    url: 'https://certus.one',
-    src: certusone,
-  },
-  {
-    name: 'Stake.fish',
-    url: 'https://stake.fish/en/',
-    src: stakefish,
-  },
-  {
-    name: 'Chainlayer',
-    url: 'https://www.chainlayer.io',
-    src: chainlayer,
-  },
-  {
-    name: 'Chorus One',
-    url: 'https://chorus.one',
-    src: chorusone,
-  },
-  {
     name: 'Figment Networks',
     url: 'https://figment.network',
     src: figment,
@@ -247,7 +227,7 @@ const Logo: React.FC<LogoProps> = ({ item }) => (
   <a
     className="logo-item grayscale"
     href={item.url}
-    target="_blank"
+    target={item.url.length > 1 ? "_blank" : ""}
     rel="noopener noreferrer"
   >
     <img

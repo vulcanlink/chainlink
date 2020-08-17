@@ -19,7 +19,7 @@ interface DispatchProps {
   setDrawer: any
 }
 
-interface Props extends OwnProps, StateProps, DispatchProps {}
+interface Props extends OwnProps, StateProps, DispatchProps { }
 
 const NodeDetailsModal: React.FC<Props> = ({
   config,
@@ -52,8 +52,8 @@ const NodeDetailsModal: React.FC<Props> = ({
       {sideDrawer && sideDrawer.type === 'oracle' ? (
         <NodeDetailsContent data={sideDrawer} jobId={jobId} config={config} />
       ) : (
-        <ContractDetailsContent data={sideDrawer} config={config} />
-      )}
+          <ContractDetailsContent data={sideDrawer} config={config} />
+        )}
     </Drawer>
   )
 }
@@ -66,6 +66,7 @@ interface NodeDetailsContentProps {
 
 const NodeDetailsContent: React.FC<NodeDetailsContentProps> = ({
   data = {},
+  //@ts-ignore
   jobId,
   config,
 }) => {
@@ -97,29 +98,37 @@ const NodeDetailsContent: React.FC<NodeDetailsContentProps> = ({
 
       <div>
         <h4>Find out more in:</h4>
-        <Button
-          style={{ marginRight: 10 }}
-          ghost
-          type="primary"
-          disabled={!jobId}
-        >
-          <a
-            target="_BLANK"
-            rel="noopener noreferrer"
-            href={`https://explorer.chain.link/job-runs?search=${jobId}`}
-          >
-            Chainlink Explorer
-          </a>
-        </Button>
-        <Button style={{ marginRight: 10 }} ghost type="primary">
-          <a
-            target="_BLANK"
-            rel="noopener noreferrer"
-            href={`https://market.link/search/nodes?search=${data.address}`}
-          >
-            Market.link
-          </a>
-        </Button>
+        {/*
+        //DISABLE FOR ELASTOS
+        config.networkId === Networks.MAINNET && (
+          <>
+            <Button
+              style={{ marginRight: 10 }}
+              ghost
+              type="primary"
+              disabled={!jobId}
+            >
+              <a
+                target="_BLANK"
+                rel="noopener noreferrer"
+                href={`https://explorer.chain.link/job-runs?search=${jobId}`}
+              >
+                Chainlink Explorer
+              </a>
+            </Button>
+            <Button style={{ marginRight: 10 }} ghost type="primary">
+              <a
+                target="_BLANK"
+                rel="noopener noreferrer"
+                href={`https://market.link/search/nodes?search=${data.address}`}
+              >
+                Market.link
+              </a>
+            </Button>{' '}
+          </>
+        )
+        */}
+
         <Button ghost type="primary">
           <a
             target="_BLANK"

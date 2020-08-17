@@ -1,8 +1,7 @@
 import { ethers } from 'ethers'
 import { FunctionFragment } from 'ethers/utils'
-import { JsonRpcProvider, Log, Filter } from 'ethers/providers'
-import { Config } from '../config'
-import { networkName, Networks } from '../utils'
+import { JsonRpcProvider, Log } from 'ethers/providers'
+import { /*networkName,*/ Networks } from '../utils'
 
 /**
  * Connect to a deployed contract
@@ -19,17 +18,23 @@ export function createContract(
   return new ethers.Contract(address, contractInterface, provider)
 }
 
+// Override custom ETH_RPC
+// const REACT_APP_INFURA_KEY = process.env.REACT_APP_INFURA_KEY
+const REACT_APP_ETH_RPC = process.env.REACT_APP_ETH_RPC
+
 /**
  * Initialize the infura provider for the given network
  *
  * @param networkId The network id from the whitelist
  */
 export function createInfuraProvider(
+  //@ts-ignore
   networkId: Networks = Networks.MAINNET,
 ): JsonRpcProvider {
   const provider = new ethers.providers.JsonRpcProvider(
-    Config.devProvider() ??
-      `https://${networkName(networkId)}.infura.io/v3/${Config.infuraKey()}`,
+    REACT_APP_ETH_RPC
+    // Override custom ETH_RPC
+    //`https://${networkName(networkId)}.infura.io/v3/${REACT_APP_INFURA_KEY}`,
   )
   provider.pollingInterval = 8000
 
@@ -82,7 +87,7 @@ interface Query {
 export async function getLogs(
   { provider, filter, eventInterface }: Query,
   /* eslint-disable-next-line @typescript-eslint/no-empty-function */
-  cb: any = () => {},
+  cb = () => { },
 ): Promise<any[]> {
   const logs = await provider.getLogs(filter)
   const result = logs
@@ -105,7 +110,7 @@ interface LogResult {
 /* eslint-disable-next-line @typescript-eslint/no-empty-function */
 export function decodeLog(
   { log, eventInterface }: LogResult,
-  cb: Function = () => {},
+  cb: Function = () => { },
 ) {
   const decodedLog = eventInterface.decode(log.data, log.topics)
   const meta = {
