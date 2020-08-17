@@ -50,18 +50,22 @@ export function createInfuraProvider(
  */
 export function formatAnswer(
   value: any,
-  multiply?: string,
-  decimalPlaces = 2,
+  multiply: string,
+  decimalPlaces: number,
+  formatDecimalPlaces: number,
 ): string {
-  const decimals = 10 ** decimalPlaces
-  const divided = value.mul(decimals).div(multiply)
-  const formatted = ethers.utils.formatUnits(divided, decimalPlaces)
-  return formatted.toString()
-}
+  try {
+    const decimals = 10 ** decimalPlaces
+    const divided = value.mul(decimals).div(multiply)
+    const formatted = ethers.utils.formatUnits(
+      divided,
+      decimalPlaces + formatDecimalPlaces,
+    )
 
-interface Filter {
-  fromBlock: any
-  toBlock: any
+    return formatted.toString()
+  } catch {
+    return value
+  }
 }
 
 interface ChainlinkEvent {
