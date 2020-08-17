@@ -27,9 +27,17 @@ import snz from 'assets/nodes/snz.png'
 import stakefish from 'assets/nodes/stakefish.png'
 import stakingfacilities from 'assets/nodes/stakingfacilities.png'
 import validationcapital from 'assets/nodes/validationcapital.png'
-import vulcanlink from 'assets/nodes/vulcanlink.png'
 import watez from 'assets/nodes/watez.png'
 import ztake from 'assets/nodes/ztake.png'
+import oneNode from 'assets/nodes/01node.png'
+import tSystems from 'assets/nodes/tsystems.png'
+import dextrac from 'assets/nodes/dextrac.png'
+import dmakers from 'assets/nodes/dmakers.png'
+import huobi from 'assets/nodes/huobi.png'
+import syncnode from 'assets/nodes/syncnode.png'
+import vulcanLink from 'assets/nodes/vulcanLink.png'
+import youbi from 'assets/nodes/youbi.png'
+import staked from 'assets/nodes/staked.png'
 
 interface Node {
   name: string
@@ -39,6 +47,11 @@ interface Node {
 
 const grid = { xs: 12, sm: 8, md: 6, lg: 4 }
 const list: Node[] = [
+  {
+    name: 'T-Systems',
+    url: 'https://www.t-systems.com',
+    src: tSystems,
+  },
   {
     name: 'LinkPool',
     url: 'https://linkpool.io',
@@ -185,9 +198,44 @@ const list: Node[] = [
     src: kaiko,
   },
   {
+    name: '01Node',
+    url: 'https://01node.com',
+    src: oneNode,
+  },
+  {
+    name: 'DEXTRAC',
+    url: 'http://dex.trace.link',
+    src: dextrac,
+  },
+  {
+    name: 'dMakers',
+    url: 'https://dmakers.org',
+    src: dmakers,
+  },
+  {
+    name: 'Huobi',
+    url: 'https://www.huobi.com',
+    src: huobi,
+  },
+  {
+    name: 'SyncNode',
+    url: 'https://wallet.syncnode.ro',
+    src: syncnode,
+  },
+  {
     name: 'Vulcan Link',
     url: 'https://vulcan.link',
-    src: vulcanlink,
+    src: vulcanLink,
+  },
+  {
+    name: 'Youbi Capital',
+    url: 'http://www.youbicapital.com',
+    src: youbi,
+  },
+  {
+    name: 'Staked',
+    url: 'http://www.staked.us',
+    src: staked,
   }
 ]
 
