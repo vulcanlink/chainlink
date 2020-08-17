@@ -27,6 +27,7 @@ import snz from 'assets/nodes/snz.png'
 import stakefish from 'assets/nodes/stakefish.png'
 import stakingfacilities from 'assets/nodes/stakingfacilities.png'
 import validationcapital from 'assets/nodes/validationcapital.png'
+import vulcanlink from 'assets/nodes/vulcanlink.png'
 import watez from 'assets/nodes/watez.png'
 import ztake from 'assets/nodes/ztake.png'
 
@@ -183,6 +184,11 @@ const list: Node[] = [
     url: 'https://www.kaiko.com',
     src: kaiko,
   },
+  {
+    name: 'Vulcan Link',
+    url: 'https://vulcan.link',
+    src: vulcanlink,
+  }
 ]
 
 interface LogoProps {
