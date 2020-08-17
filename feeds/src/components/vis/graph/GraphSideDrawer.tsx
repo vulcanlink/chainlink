@@ -19,7 +19,7 @@ interface DispatchProps {
   setDrawer: any
 }
 
-interface Props extends OwnProps, StateProps, DispatchProps {}
+interface Props extends OwnProps, StateProps, DispatchProps { }
 
 const NodeDetailsModal: React.FC<Props> = ({
   config,
@@ -52,8 +52,8 @@ const NodeDetailsModal: React.FC<Props> = ({
       {sideDrawer && sideDrawer.type === 'oracle' ? (
         <NodeDetailsContent data={sideDrawer} jobId={jobId} config={config} />
       ) : (
-        <ContractDetailsContent data={sideDrawer} config={config} />
-      )}
+          <ContractDetailsContent data={sideDrawer} config={config} />
+        )}
     </Drawer>
   )
 }
@@ -66,6 +66,7 @@ interface NodeDetailsContentProps {
 
 const NodeDetailsContent: React.FC<NodeDetailsContentProps> = ({
   data = {},
+  //@ts-ignore
   jobId,
   config,
 }) => {
@@ -97,7 +98,9 @@ const NodeDetailsContent: React.FC<NodeDetailsContentProps> = ({
 
       <div>
         <h4>Find out more in:</h4>
-        {config.networkId === Networks.MAINNET && (
+        {/*
+        //DISABLE FOR ELASTOS
+        config.networkId === Networks.MAINNET && (
           <>
             <Button
               style={{ marginRight: 10 }}
@@ -123,7 +126,9 @@ const NodeDetailsContent: React.FC<NodeDetailsContentProps> = ({
               </a>
             </Button>{' '}
           </>
-        )}
+        )
+        */}
+
         <Button ghost type="primary">
           <a
             target="_BLANK"

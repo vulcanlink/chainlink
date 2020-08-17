@@ -1,5 +1,6 @@
 import React from 'react'
 import { Row, Col } from 'antd'
+/*
 import alphavantage from 'assets/nodes/alphavantage.png'
 import anyblock from 'assets/nodes/anyblock.png'
 import bharvest from 'assets/nodes/bharvest.png'
@@ -29,6 +30,10 @@ import stakingfacilities from 'assets/nodes/stakingfacilities.png'
 import validationcapital from 'assets/nodes/validationcapital.png'
 import watez from 'assets/nodes/watez.png'
 import ztake from 'assets/nodes/ztake.png'
+*/
+import white from 'assets/nodes/white.png'
+import vulcanlink from 'assets/nodes/vulcanlink.png'
+
 
 interface Node {
   name: string
@@ -39,30 +44,36 @@ interface Node {
 const grid = { xs: 12, sm: 8, md: 6, lg: 4 }
 const list: Node[] = [
   {
-    name: 'LinkPool',
-    url: 'https://linkpool.io',
-    src: linkpool,
+    name: 'Vulcan Link',
+    url: 'https://vulcan.link',
+    src: vulcanlink
   },
   {
-    name: 'Certus one',
-    url: 'https://certus.one',
-    src: certusone,
+    name: '',
+    url: '#',
+    src: white,
   },
   {
-    name: 'Stake.fish',
-    url: 'https://stake.fish/en/',
-    src: stakefish,
+    name: '',
+    url: '#',
+    src: white,
   },
   {
-    name: 'Chainlayer',
-    url: 'https://www.chainlayer.io',
-    src: chainlayer,
+    name: '',
+    url: '#',
+    src: white,
   },
   {
-    name: 'Chorus One',
-    url: 'https://chorus.one',
-    src: chorusone,
+    name: '',
+    url: '#',
+    src: white,
   },
+  {
+    name: '',
+    url: '#',
+    src: white,
+  }
+  /*
   {
     name: 'Figment Networks',
     url: 'https://figment.network',
@@ -183,6 +194,7 @@ const list: Node[] = [
     url: 'https://www.kaiko.com',
     src: kaiko,
   },
+  */
 ]
 
 interface LogoProps {
@@ -193,7 +205,7 @@ const Logo: React.FC<LogoProps> = ({ item }) => (
   <a
     className="logo-item grayscale"
     href={item.url}
-    target="_blank"
+    target={item.url.length > 1 ? "_blank" : ""}
     rel="noopener noreferrer"
   >
     <img

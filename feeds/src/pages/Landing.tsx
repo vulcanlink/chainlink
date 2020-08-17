@@ -42,11 +42,28 @@ const Page = () => {
             shared global resource which is sponsored by a growing list of top
             DeFi Dapps.
           </p>
+          {/* 
           <p>
             Please feel free to look into the details of each Decentralized
             Oracle Network listed below. You can easily use these oracle
             networks to quickly and securely launch, add more capabilities to
             and/or just greatly improve the security of your smart contracts.
+          </p>
+          */}
+        </section>
+        <section>
+          <h3>Elastos Sidechains</h3>
+          <h4>Ethereum but with DPoS</h4>
+          <p>
+            A redefined EVM draws on the Elastos DPoS supernodes to replace the slower PoW consensus with blazing fast block confirmation at up to 1,500+ TPS pre-sharding.
+          </p>
+          <h4>Solidity Smart Contracts</h4>
+          <p>
+            The Elastos EVM will continually update allowing it to be fully backwards-compatible with Solidity Smart Contracts.
+          </p>
+          <h4>Dedicated Sidechains</h4>
+          <p>
+            Dedicated TPS can be allocated to a customized sidechain, which gives developers the freedom to invent their own multi-chain or scaling solution.
           </p>
         </section>
         <section>

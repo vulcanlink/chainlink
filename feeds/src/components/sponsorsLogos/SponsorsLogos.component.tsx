@@ -1,16 +1,8 @@
 import React from 'react'
+
 import { Row, Col, Button } from 'antd'
-import aave from 'assets/sponsors/aave.png'
-import ampleforth from 'assets/sponsors/ampleforth.png'
-import loopring from 'assets/sponsors/loopring.png'
-import nexusmutual from 'assets/sponsors/nexusmutual.png'
-import openlaw from 'assets/sponsors/openlaw.png'
-import setprotocol from 'assets/sponsors/setprotocol.png'
-import synthetix from 'assets/sponsors/synthetix.png'
-import dmm from 'assets/sponsors/dmm.png'
-import bzx from 'assets/sponsors/bzx.png'
-import haven from 'assets/sponsors/haven.png'
-import OneInch from 'assets/sponsors/1inch.png'
+import white from 'assets/sponsors/white.png'
+import CyberRepublic from 'assets/sponsors/cyberrepublic.png'
 
 import ReactGA from 'react-ga'
 
@@ -23,60 +15,20 @@ interface Sponsor {
 const grid = { xs: 24, sm: 12, md: 8 }
 const list: Sponsor[] = [
   {
-    name: 'Synthetix',
-    url: 'https://www.synthetix.io/',
-    src: synthetix,
+    name: 'CyberRepublic',
+    url: 'https://www.cyberrepublic.org/',
+    src: CyberRepublic
   },
   {
-    name: 'Loopring',
-    url: 'https://loopring.org/',
-    src: loopring,
+    name: '',
+    url: '#',
+    src: white,
   },
   {
-    name: 'Aavve',
-    url: 'https://aave.com/',
-    src: aave,
-  },
-  {
-    name: 'Ampleforth',
-    url: 'https://www.ampleforth.org/',
-    src: ampleforth,
-  },
-  {
-    name: 'Set Protocol',
-    url: 'https://www.tokensets.com/',
-    src: setprotocol,
-  },
-  {
-    name: 'Nexusmutual',
-    url: 'https://nexusmutual.io',
-    src: nexusmutual,
-  },
-  {
-    name: 'OpenLaw',
-    url: 'https://www.openlaw.io',
-    src: openlaw,
-  },
-  {
-    name: 'DMM',
-    url: 'https://defimoneymarket.com',
-    src: dmm,
-  },
-  {
-    name: 'bZx',
-    url: 'https://bzx.network',
-    src: bzx,
-  },
-  {
-    name: 'Haven Protocol',
-    url: 'https://havenprotocol.org',
-    src: haven,
-  },
-  {
-    name: '1inch',
-    url: 'https://1inch.exchange',
-    src: OneInch,
-  },
+    name: '',
+    url: '#',
+    src: white,
+  }
 ]
 
 interface LogoProps {
@@ -87,7 +39,7 @@ const Logo: React.FC<LogoProps> = ({ item }) => (
   <a
     className="logo-item"
     href={item.url}
-    target="_blank"
+    target={item.url.length > 1 ? "_blank" : ""}
     rel="noopener noreferrer"
   >
     <img
@@ -99,6 +51,8 @@ const Logo: React.FC<LogoProps> = ({ item }) => (
   </a>
 )
 
+const REACT_APP_COMMUNITY_TYPEFORM_TITLE = process.env.REACT_APP_COMMUNITY_TYPEFORM_TITLE || 'Integrate with Chainlink'
+
 const SponsorsLogos = () => (
   <section className="logos-wrapper">
     <div className="cta-integrate">
@@ -107,15 +61,15 @@ const SponsorsLogos = () => (
           ReactGA.event({
             category: 'Form Conversion',
             action: 'Click on Button',
-            label: 'Integrate with Chainlink',
+            label: REACT_APP_COMMUNITY_TYPEFORM_TITLE,
           })
         }
-        href="https://chainlinkcommunity.typeform.com/to/XcgLVP"
+        href={process.env.REACT_APP_COMMUNITY_TYPEFORM || "https://chainlinkcommunity.typeform.com/to/XcgLVP"}
         target="_blank"
         rel="noopener noreferrer"
       >
         <Button type="primary" shape="round" size="large">
-          Integrate with Chainlink
+          {REACT_APP_COMMUNITY_TYPEFORM_TITLE}
         </Button>
       </a>
     </div>
