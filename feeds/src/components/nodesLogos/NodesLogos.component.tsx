@@ -22,7 +22,6 @@ import omniscience from 'assets/nodes/omniscience.png'
 import p2p from 'assets/nodes/p2p.png'
 import paradigmcitadel from 'assets/nodes/paradigmcitadel.png'
 import prophet from 'assets/nodes/prophet.png'
-import sdl from 'assets/nodes/sdl.png'
 import simplevc from 'assets/nodes/simplevc.png'
 import snz from 'assets/nodes/snz.png'
 import stakefish from 'assets/nodes/stakefish.png'
@@ -31,6 +30,7 @@ import validationcapital from 'assets/nodes/validationcapital.png'
 import watez from 'assets/nodes/watez.png'
 import ztake from 'assets/nodes/ztake.png'
 */
+import sdl from 'assets/nodes/sdl.png'
 import white from 'assets/nodes/white.png'
 import vulcanlink from 'assets/nodes/vulcanlink.png'
 
@@ -49,9 +49,9 @@ const list: Node[] = [
     src: vulcanlink
   },
   {
-    name: '',
-    url: '#',
-    src: white,
+    name: 'SDL',
+    url: 'https://www.securedatalinks.com',
+    src: sdl,
   },
   {
     name: '',
