@@ -8,5 +8,10 @@
     "address": "0xEE3e881876e4754D1a1CB275a4f6c27160e6ECBa",
     "name": "Secure Data Links",
     "networkId": 1
+  },
+  {
+    "address": "0x6461cC7e7b298dafC5Cd9837dAB0177078f8272b",
+    "name": "Da Vinci Nodes",
+    "networkId": 1
   }
 ]

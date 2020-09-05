@@ -33,6 +33,7 @@ import ztake from 'assets/nodes/ztake.png'
 import sdl from 'assets/nodes/sdl.png'
 import white from 'assets/nodes/white.png'
 import vulcanlink from 'assets/nodes/vulcanlink.png'
+import davinci from 'assets/nodes/davinci.png'
 
 
 interface Node {
@@ -54,9 +55,9 @@ const list: Node[] = [
     src: sdl,
   },
   {
-    name: '',
-    url: '#',
-    src: white,
+    name: 'Da Vinci Nodes',
+    url: 'https://twitter.com/DaVinciNodes',
+    src: davinci,
   },
   {
     name: '',
