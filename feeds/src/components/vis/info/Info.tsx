@@ -21,17 +21,17 @@ interface StateProps {
   pendingRoundId: any
 }
 
-export interface Props extends OwnProps, StateProps {}
+export interface Props extends OwnProps, StateProps { }
 
 const Info: React.FC<Props> = ({
   latestAnswer,
   latestAnswerTimestamp,
   latestRequestTimestamp,
   minimumAnswers,
-  oracleAnswers,
-  oracleList,
+  //oracleAnswers,
+  //oracleList,
   config,
-  pendingRoundId,
+  //pendingRoundId,
 }) => {
   const updateTime = latestAnswerTimestamp
     ? humanizeUnixTimestamp(latestAnswerTimestamp, 'h:mm A')
@@ -41,6 +41,7 @@ const Info: React.FC<Props> = ({
     ? humanizeUnixTimestamp(latestAnswerTimestamp, 'MMM Do YYYY')
     : '...'
 
+  /*
   const getCurrentResponses = () => {
     if (!oracleAnswers) {
       return '...'
@@ -54,6 +55,7 @@ const Info: React.FC<Props> = ({
       ? `${responded.length} / ${oracleList.length}`
       : '...'
   }
+  */
 
   return (
     <div className="network-graph-info__wrapper">
@@ -115,6 +117,7 @@ const Info: React.FC<Props> = ({
         </div>
       )}
 
+      {/* 
       <div className="network-graph-info__item">
         <div className="network-graph-info__item--label">
           Oracle responses (minimum {minimumAnswers || '...'}){' '}
@@ -127,6 +130,7 @@ const Info: React.FC<Props> = ({
           {getCurrentResponses()}
         </h2>
       </div>
+      */}
 
       <div className="network-graph-info__item">
         <div className="network-graph-info__item--label">

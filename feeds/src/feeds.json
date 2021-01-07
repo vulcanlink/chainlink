@@ -1,6 +1,6 @@
 [
   {
-    "contractAddress": "0xA64267e44af675498310620418c8F08A9dAeB1eb",
+    "contractAddress": "0xfa9259556aaadA6f44E97882D12b94301e6B3c15",
     "contractType": "aggregator",
     "contractVersion": 2,
     "name": "ELA / USD",
@@ -21,6 +21,30 @@
     "threshold": 1,
     "compareOffchain": "https://www.tradingview.com/symbols/ELAUSDT/?exchange=HUOBI",
     "healthPrice": "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=elastos",
+    "listing": true
+  },
+  {
+    "contractAddress": "0x596CCC0545d0a85C0AF72fDD9c3af299f5Ec65Fa",
+    "contractType": "aggregator",
+    "contractVersion": 2,
+    "name": "ELA / ETH",
+    "valuePrefix": "Ξ",
+    "pair": [
+      "ELA",
+      "ETH"
+    ],
+    "heartbeat": 3600,
+    "path": "ela-eth",
+    "networkId": 1,
+    "history": false,
+    "decimalPlaces": 9,
+    "multiply": "1000000000000000000",
+    "sponsored": [
+      "CyberRepublic"
+    ],
+    "threshold": 1,
+    "compareOffchain": "https://www.tradingview.com/symbols/ELAETH/?exchange=HUOBI",
+    "healthPrice": "https://api.coingecko.com/api/v3/coins/markets?vs_currency=eth&ids=elastos",
     "listing": true
   }
 ]

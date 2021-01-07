@@ -30,6 +30,7 @@ const App = () => {
   }, [])
 
   return (
+    //@ts-ignore
     <Router history={history}>
       <Switch>
         <Route exact path="/" component={pages.Landing} />
