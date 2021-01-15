@@ -52,18 +52,15 @@ const Page = () => {
           */}
         </section>
         <section>
-          <h3>Elastos Sidechains</h3>
-          <h4>Ethereum but with DPoS</h4>
-          <p>
-            A redefined EVM draws on the Elastos DPoS supernodes to replace the slower PoW consensus with blazing fast block confirmation at up to 1,500+ TPS pre-sharding.
-          </p>
+          <h3>SKALE Elastic Sidechains</h3>
           <h4>Solidity Smart Contracts</h4>
           <p>
-            The Elastos EVM will continually update allowing it to be fully backwards-compatible with Solidity Smart Contracts.
+            Deploy with just a few lines of code.
           </p>
-          <h4>Dedicated Sidechains</h4>
+          <h4>Dedicated Elastic Sidechains</h4>
           <p>
-            Dedicated TPS can be allocated to a customized sidechain, which gives developers the freedom to invent their own multi-chain or scaling solution.
+            Run your dApps in a decentralized modular cloud built for real-world needs and configured for your requirements.
+            Dedicated TPS can be allocated to a customized elastic sidechain, which gives developers the freedom to run their dApps at scale.
           </p>
         </section>
         <section>

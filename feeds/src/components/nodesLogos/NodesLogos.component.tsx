@@ -29,11 +29,11 @@ import stakingfacilities from 'assets/nodes/stakingfacilities.png'
 import validationcapital from 'assets/nodes/validationcapital.png'
 import watez from 'assets/nodes/watez.png'
 import ztake from 'assets/nodes/ztake.png'
-*/
 import sdl from 'assets/nodes/sdl.png'
+import davinci from 'assets/nodes/davinci.png'
+*/
 import white from 'assets/nodes/white.png'
 import vulcanlink from 'assets/nodes/vulcanlink.png'
-import davinci from 'assets/nodes/davinci.png'
 
 
 interface Node {
@@ -50,14 +50,14 @@ const list: Node[] = [
     src: vulcanlink
   },
   {
-    name: 'SDL',
-    url: 'https://www.securedatalinks.com',
-    src: sdl,
+    name: '',
+    url: '#',
+    src: white,
   },
   {
-    name: 'Da Vinci Nodes',
-    url: 'https://twitter.com/DaVinciNodes',
-    src: davinci,
+    name: '',
+    url: '#',
+    src: white,
   },
   {
     name: '',

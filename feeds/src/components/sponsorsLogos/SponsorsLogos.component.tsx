@@ -2,7 +2,7 @@ import React from 'react'
 
 import { Row, Col, Button } from 'antd'
 import white from 'assets/sponsors/white.png'
-import CyberRepublic from 'assets/sponsors/cyberrepublic.png'
+import SKALE from 'assets/sponsors/skale.png'
 
 import ReactGA from 'react-ga'
 
@@ -15,9 +15,9 @@ interface Sponsor {
 const grid = { xs: 24, sm: 12, md: 8 }
 const list: Sponsor[] = [
   {
-    name: 'CyberRepublic',
-    url: 'https://www.cyberrepublic.org/',
-    src: CyberRepublic
+    name: 'SKALE Labs',
+    url: 'https://skale.network/',
+    src: SKALE
   },
   {
     name: '',

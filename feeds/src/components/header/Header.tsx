@@ -5,7 +5,7 @@ import { withRouter, RouteComponentProps } from 'react-router'
 import ReactGA from 'react-ga'
 //@ts-ignore
 import ChainlinkLogo from '../shared/ChainlinkLogo'
-import ElastosLogo from '../../assets/chainlinkXelastos.svg'
+import SkaleLogo from '../../assets/chainlinkXskale.svg'
 
 
 interface Props extends RouteComponentProps { }
@@ -18,7 +18,7 @@ const Header: React.FC<Props> = ({ location }) => {
       <div className="header__main-nav">
         <Link to="/">
           <div className="header__logotype">
-            <img style={{ height: 50 }} src={ElastosLogo} />
+            <img style={{ height: 50 }} src={SkaleLogo} />
             {//<ChainlinkLogo />
             }
             <h1>{process.env.REACT_APP_CHAINLINK_HEADER_TITLE || "Chainlink"}</h1>

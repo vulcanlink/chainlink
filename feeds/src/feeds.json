@@ -1,50 +1,50 @@
 [
   {
-    "contractAddress": "0xfa9259556aaadA6f44E97882D12b94301e6B3c15",
+    "contractAddress": "0x10218B21A884b69Ed38e241a8647BC7CC57A929b",
     "contractType": "aggregator",
     "contractVersion": 2,
-    "name": "ELA / USD",
+    "name": "SKL / USD",
     "valuePrefix": "$",
     "pair": [
-      "ELA",
+      "SKL",
       "USD"
     ],
     "heartbeat": 3600,
-    "path": "ela-usd",
+    "path": "skl-usd",
     "networkId": 1,
     "history": false,
     "decimalPlaces": 3,
     "multiply": "100000000",
     "sponsored": [
-      "CyberRepublic"
+      "SKALE"
     ],
     "threshold": 1,
-    "compareOffchain": "https://www.tradingview.com/symbols/ELAUSDT/?exchange=HUOBI",
-    "healthPrice": "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=elastos",
+    "compareOffchain": "https://www.tradingview.com/symbols/SKLUSDT/?exchange=HUOBI",
+    "healthPrice": "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=skale",
     "listing": true
   },
   {
-    "contractAddress": "0x596CCC0545d0a85C0AF72fDD9c3af299f5Ec65Fa",
+    "contractAddress": "0xf0bB3C18A9aAa02069bf64A2478e039B745961A7",
     "contractType": "aggregator",
     "contractVersion": 2,
-    "name": "ELA / ETH",
+    "name": "SKL / ETH",
     "valuePrefix": "Ξ",
     "pair": [
-      "ELA",
+      "SKL",
       "ETH"
     ],
     "heartbeat": 3600,
-    "path": "ela-eth",
+    "path": "skl-eth",
     "networkId": 1,
     "history": false,
     "decimalPlaces": 9,
     "multiply": "1000000000000000000",
     "sponsored": [
-      "CyberRepublic"
+      "SKALE"
     ],
     "threshold": 1,
-    "compareOffchain": "https://www.tradingview.com/symbols/ELAETH/?exchange=HUOBI",
-    "healthPrice": "https://api.coingecko.com/api/v3/coins/markets?vs_currency=eth&ids=elastos",
+    "compareOffchain": "https://www.tradingview.com/symbols/SKLETH/?exchange=HUOBI",
+    "healthPrice": "https://api.coingecko.com/api/v3/coins/markets?vs_currency=eth&ids=skale",
     "listing": true
   }
 ]
